@@ -7,9 +7,18 @@
 //                        contact@pressocenter.fr. Réservé au compte gérant.
 //   POST /mail/notify    appelé par les déclencheurs de la base (voir supabase/mail.sql) :
 //                        nouvelle réservation, réservation confirmée, demande de club.
+//   POST /mail/newsletter  envoi de la lettre d'information aux abonnés (ou d'un test au
+//                        gérant). Réservé au compte gérant.
+//   GET|POST /mail/unsubscribe?t=<jeton>  désinscription de la lettre : GET renvoie vers la
+//                        page du site, POST désinscrit en un clic (en-tête List-Unsubscribe).
+//   POST /mail/push-test notification de test sur les appareils du gérant.
+//
+// Les nouvelles demandes et les messages reçus déclenchent aussi une notification
+// sur les appareils où le gérant l'a activée (Web Push, table push_subscriptions).
 //
 // Secrets de la fonction : RESEND_API_KEY, RESEND_WEBHOOK_SECRET, HOOK_SECRET,
-// NOTIFY_TO, MAIL_FROM, SITE_URL. Aucun secret dans ce fichier.
+// NOTIFY_TO, MAIL_FROM, SITE_URL, VAPID_PUBLIC_KEY, VAPID_PRIVATE_JWK.
+// Aucun secret dans ce fichier.
 
 const RESEND = 'https://api.resend.com';
 const env = (k: string) => Deno.env.get(k) ?? '';
@@ -49,16 +58,17 @@ async function db(path: string, opts: { method?: string; body?: unknown; prefer?
   return text ? JSON.parse(text) : null;
 }
 
-async function isAdmin(authorization: string) {
-  if (!/^Bearer\s+\S+/i.test(authorization)) return false;
+// Renvoie le compte gérant correspondant au jeton, ou null
+async function adminUser(authorization: string): Promise<{ id: string; email?: string } | null> {
+  if (!/^Bearer\s+\S+/i.test(authorization)) return null;
   const res = await fetch(`${env('SUPABASE_URL')}/auth/v1/user`, {
     headers: { apikey: env('SUPABASE_SERVICE_ROLE_KEY'), Authorization: authorization },
   });
-  if (!res.ok) return false;
+  if (!res.ok) return null;
   const user = await res.json();
-  if (!user?.id) return false;
+  if (!user?.id) return null;
   const rows = await db(`/admins?user_id=eq.${encodeURIComponent(user.id)}&select=user_id`);
-  return Array.isArray(rows) && rows.length === 1;
+  return Array.isArray(rows) && rows.length === 1 ? user : null;
 }
 
 const htmlToText = (h: string) =>
@@ -88,7 +98,9 @@ async function resend(path: string, opts: { method?: string; body?: unknown; ide
     data = text;
   }
   if (!res.ok) {
-    throw new Error(`Resend ${res.status} sur ${path} : ${typeof data === 'string' ? data : JSON.stringify(data)}`);
+    const err = new Error(`Resend ${res.status} sur ${path} : ${typeof data === 'string' ? data : JSON.stringify(data)}`) as Error & { status?: number };
+    err.status = res.status;
+    throw err;
   }
   return data;
 }
@@ -136,8 +148,124 @@ const textOf = (title: string, intro: string, rows: [string, string][], outro = 
   [title, '', intro.replace(/<[^>]+>/g, ''), '', ...rows.filter(([, v]) => v).map(([k, v]) => `${k} : ${v.replace(/<[^>]+>/g, '')}`), '', outro.replace(/<[^>]+>/g, ''), '', 'Presso Center · ' + SITE()]
     .join('\n');
 
-// ---------------------------------------------------------------- Notifications
 type Row = Record<string, any>;
+
+// ---------------------------------------------------------------- Notifications push (Web Push : RFC 8291 et 8292)
+// Écrit avec WebCrypto, sans dépendance : chiffrement « aes128gcm » du message
+// pour l'appareil, et jeton VAPID signé avec la clé privée de la fonction.
+const b64u = (bytes: Uint8Array) => {
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+const unb64u = (v: string) => {
+  const t = v.replace(/-/g, '+').replace(/_/g, '/');
+  return Uint8Array.from(atob(t + '==='.slice((t.length + 3) % 4)), (c) => c.charCodeAt(0));
+};
+const concat = (...parts: Uint8Array[]) => {
+  const out = new Uint8Array(parts.reduce((n, x) => n + x.length, 0));
+  let o = 0;
+  for (const x of parts) {
+    out.set(x, o);
+    o += x.length;
+  }
+  return out;
+};
+
+async function hkdf(salt: Uint8Array, ikm: Uint8Array, info: Uint8Array, length: number) {
+  const key = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
+  return new Uint8Array(await crypto.subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt, info }, key, length * 8));
+}
+
+async function encryptPush(payload: Uint8Array, p256dh: string, auth: string) {
+  const enc = new TextEncoder();
+  const uaPublic = unb64u(p256dh);
+  const authSecret = unb64u(auth);
+  if (uaPublic.length !== 65 || authSecret.length !== 16) throw new Error("Abonnement de l'appareil invalide.");
+  const local = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']) as CryptoKeyPair;
+  const asPublic = new Uint8Array(await crypto.subtle.exportKey('raw', local.publicKey));
+  const uaKey = await crypto.subtle.importKey('raw', uaPublic, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+  const shared = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: uaKey }, local.privateKey, 256));
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const ikm = await hkdf(authSecret, shared, concat(enc.encode('WebPush: info\0'), uaPublic, asPublic), 32);
+  const cek = await hkdf(salt, ikm, enc.encode('Content-Encoding: aes128gcm\0'), 16);
+  const nonce = await hkdf(salt, ikm, enc.encode('Content-Encoding: nonce\0'), 12);
+  const key = await crypto.subtle.importKey('raw', cek, 'AES-GCM', false, ['encrypt']);
+  // un seul enregistrement : le contenu suivi du délimiteur 0x02
+  const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, key, concat(payload, new Uint8Array([2]))));
+  const header = new Uint8Array(21);
+  header.set(salt, 0);
+  new DataView(header.buffer).setUint32(16, 4096);
+  header[20] = asPublic.length;
+  return concat(header, asPublic, cipher);
+}
+
+async function vapidAuthorization(endpoint: string) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey('jwk', JSON.parse(env('VAPID_PRIVATE_JWK')), { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+  const head = b64u(enc.encode(JSON.stringify({ typ: 'JWT', alg: 'ES256' })));
+  const claims = b64u(enc.encode(JSON.stringify({ aud: new URL(endpoint).origin, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: `mailto:${FROM_ADDRESS()}` })));
+  const sig = new Uint8Array(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, enc.encode(`${head}.${claims}`)));
+  return `vapid t=${head}.${claims}.${b64u(sig)}, k=${env('VAPID_PUBLIC_KEY')}`;
+}
+
+type PushNote = { title: string; body: string; url?: string; tag?: string };
+
+async function sendPush(sub: { endpoint: string; p256dh: string; auth: string }, note: PushNote) {
+  if (!/^https:\/\//.test(sub.endpoint)) throw new Error('Adresse de notification invalide.');
+  const body = await encryptPush(new TextEncoder().encode(JSON.stringify(note)), sub.p256dh, sub.auth);
+  const res = await fetch(sub.endpoint, {
+    method: 'POST',
+    headers: {
+      Authorization: await vapidAuthorization(sub.endpoint),
+      'Content-Encoding': 'aes128gcm',
+      'Content-Type': 'application/octet-stream',
+      TTL: '86400',
+      Urgency: 'high',
+    },
+    body,
+  });
+  await res.arrayBuffer().catch(() => null);
+  return res.status;
+}
+
+// Envoie la notification à tous les appareils enregistrés (ou à un seul, pour le test)
+async function pushAll(note: PushNote, onlyEndpoint = '') {
+  const out = { total: 0, sent: 0, expired: 0, failed: 0, errors: [] as string[] };
+  if (!env('VAPID_PRIVATE_JWK') || !env('VAPID_PUBLIC_KEY')) {
+    out.errors.push('Notifications non configurées.');
+    return out;
+  }
+  const subs: Row[] = (await db('/push_subscriptions?select=id,endpoint,p256dh,auth')) ?? [];
+  const list = onlyEndpoint ? subs.filter((x) => x.endpoint === onlyEndpoint) : subs;
+  out.total = list.length;
+  await Promise.all(list.map(async (sub) => {
+    try {
+      const status = await sendPush(sub as { endpoint: string; p256dh: string; auth: string }, note);
+      if (status >= 200 && status < 300) out.sent++;
+      else if (status === 404 || status === 410) {
+        // l'appareil s'est désabonné : on oublie son abonnement
+        out.expired++;
+        await db(`/push_subscriptions?id=eq.${sub.id}`, { method: 'DELETE', prefer: 'return=minimal' });
+      } else {
+        out.failed++;
+        out.errors.push(`Réponse ${status}`);
+      }
+    } catch (e) {
+      out.failed++;
+      out.errors.push(e instanceof Error ? e.message : String(e));
+    }
+  }));
+  return out;
+}
+
+// Une notification qui échoue ne doit jamais bloquer un e-mail ni une réservation
+const safePush = (note: PushNote) => pushAll(note).catch((e) => {
+  console.error('push', e);
+  return null;
+});
+
+// ---------------------------------------------------------------- Notifications par e-mail
 
 function bookingRows(b: Row, forOwner: boolean): [string, string][] {
   const formule = `${esc(b.service_name || b.service || 'Séance')}${Number(b.people) > 1 ? ' × ' + esc(b.people) : ''}`;
@@ -166,6 +294,12 @@ async function notify(kind: string, r: Row) {
 
   if (kind === 'booking_new') {
     const when = `${dateFr(r.start_at)} à ${timeFr(r.start_at)}`;
+    const pushed = await safePush({
+      title: 'Nouvelle demande de réservation',
+      body: `${r.client_name || 'Un client'} · ${r.service_name || 'séance'} · ${when}`,
+      url: `${SITE()}/gestion.html#agenda`, tag: `booking-${r.id}`,
+    });
+    if (pushed?.sent) sent.push('push');
     if (owner) {
       const title = 'Nouvelle demande de réservation';
       const intro = `${esc(r.client_name || 'Un client')} demande une séance le <b>${esc(when)}</b>. Elle attend ta confirmation dans l'agenda.`;
@@ -202,6 +336,12 @@ async function notify(kind: string, r: Row) {
       sent.push('client');
     }
   } else if (kind === 'club_request') {
+    const pushed = await safePush({
+      title: 'Demande de test pilote',
+      body: `${r.name || 'Un club'}${r.contact_name ? ' · ' + r.contact_name : ''}`,
+      url: `${SITE()}/gestion.html#clients`, tag: `club-${r.id}`,
+    });
+    if (pushed?.sent) sent.push('push');
     if (owner) {
       const title = 'Nouvelle demande de test pilote';
       const intro = `<b>${esc(r.name || 'Un club')}</b> souhaite organiser un test pilote.`;
@@ -271,9 +411,9 @@ async function forwardInbound(emailId: string) {
   const to = (Array.isArray(mail.to) ? mail.to : [mail.to]).filter(Boolean).join(', ');
 
   // Messagerie de l'espace de gestion : texte seul, jamais de HTML reçu de l'extérieur
-  await db('/messages?on_conflict=resend_id', {
+  const stored = await db('/messages?on_conflict=resend_id', {
     method: 'POST',
-    prefer: 'resolution=ignore-duplicates,return=minimal',
+    prefer: 'resolution=ignore-duplicates,return=representation',
     body: {
       direction: 'in',
       from_name: sender.name.slice(0, 200) || null,
@@ -286,6 +426,14 @@ async function forwardInbound(emailId: string) {
       message_id: mail.message_id ? String(mail.message_id).slice(0, 500) : null,
     },
   });
+  // (rien si le webhook est rejoué : le message est déjà enregistré)
+  if (Array.isArray(stored) && stored.length) {
+    await safePush({
+      title: `Message de ${(sender.name || sender.email).slice(0, 60)}`,
+      body: String(mail.subject || '(sans objet)').slice(0, 140),
+      url: `${SITE()}/gestion.html#messages`, tag: `message-${emailId}`,
+    });
+  }
 
   // Pièces jointes, dans la limite de taille acceptée
   const attachments: { filename: string; content: string }[] = [];
@@ -370,17 +518,145 @@ async function sendFromApp(p: Record<string, any>) {
   return rows?.[0] ?? null;
 }
 
+// ---------------------------------------------------------------- Lettre d'information
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const PLACEHOLDER_RE = /\[[^\]\n]{1,60}\]/;
+
+// Texte simple -> HTML : paragraphes, retours à la ligne, adresses web cliquables
+function richText(text: string) {
+  return text.split(/\n{2,}/).map((par) =>
+    `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#2b3140">${
+      esc(par).replace(/https?:\/\/[^\s<]+/g, (raw) => {
+        const url = raw.replace(/[.,;:!?)]+$/, '');
+        return `<a href="${url}" style="color:#8a6a2f">${url}</a>${raw.slice(url.length)}`;
+      }).replace(/\n/g, '<br>')
+    }</p>`).join('');
+}
+
+function newsletterEmail(subject: string, body: string, cta: boolean, r: { email: string; name?: string | null; token?: string | null }, test: boolean) {
+  // « {prénom} » est remplacé par le prénom de l'abonné, ou retiré s'il est inconnu
+  const text = body.replace(/\{pr[ée]nom\}/gi, firstName(r.name)).replace(/^(Bonjour|Bonsoir|Salut|Hello)[ \t]+,/gim, '$1,');
+  const page = `${SITE()}/desinscription.html${r.token ? `?t=${r.token}` : ''}`;
+  const oneClick = r.token ? `${env('SUPABASE_URL')}/functions/v1/mail/unsubscribe?t=${r.token}` : '';
+  const html = `<!doctype html><html lang="fr"><body style="margin:0;background:#f6f4ef;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f1623">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f4ef"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px">
+<tr><td style="background:#0f1623;border-radius:16px 16px 0 0;padding:20px 28px;color:#c4a062;font-size:12px;font-weight:800;letter-spacing:.22em">PRESSO CENTER</td></tr>
+<tr><td style="background:#ffffff;border-radius:0 0 16px 16px;padding:28px">
+<h1 style="margin:0 0 18px;font-size:22px;line-height:1.25;color:#0f1623">${esc(subject)}</h1>
+${richText(text)}
+${cta ? `<p style="margin:4px 0 0"><a href="${esc(SITE())}/reserver.html" style="display:inline-block;background:#c4a062;color:#0f1623;text-decoration:none;font-weight:700;font-size:15px;padding:13px 22px;border-radius:999px">Réserver une séance</a></p>` : ''}
+</td></tr>
+<tr><td style="padding:16px 8px;text-align:center;font-size:12px;line-height:1.6;color:#626977">Presso Center · Récupération sportive · Tours · <a href="${esc(SITE())}" style="color:#626977">${esc(SITE().replace(/^https?:\/\//, ''))}</a><br>Tu reçois cette lettre parce que tu t'es inscrit(e) sur le site ou lors d'une réservation. <a href="${esc(page)}" style="color:#626977">Se désinscrire</a></td></tr>
+</table></td></tr></table></body></html>`;
+  return {
+    from: FROM(), to: [r.email], reply_to: FROM_ADDRESS(), subject: (test ? '[Test] ' : '') + subject, html,
+    text: `${text}\n\n${cta ? `Réserver une séance : ${SITE()}/reserver.html\n\n` : ''}--\nPresso Center · ${SITE()}\nSe désinscrire : ${page}`,
+    ...(oneClick ? { headers: { 'List-Unsubscribe': `<${oneClick}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' } } : {}),
+  };
+}
+
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function sendNewsletter(p: Record<string, any>, user: { email?: string }) {
+  const subject = String(p.subject ?? '').trim();
+  const body = String(p.body ?? '').trim();
+  const id = String(p.id ?? '');
+  const test = p.test === true;
+  if (!subject || subject.length > 200) throw new Error("L'objet est obligatoire (200 caractères maximum).");
+  if (!body || body.length > 20000) throw new Error('La lettre est vide ou trop longue.');
+  if (!UUID_RE.test(id)) throw new Error('Identifiant de la lettre manquant.');
+  if (PLACEHOLDER_RE.test(subject) || PLACEHOLDER_RE.test(body)) throw new Error('Il reste un passage entre crochets à compléter.');
+
+  let recipients: { email: string; name?: string | null; token?: string | null }[];
+  if (test) {
+    const to = String(user.email ?? '').trim();
+    if (!EMAIL_RE.test(to)) throw new Error("Ton compte n'a pas d'adresse e-mail pour recevoir le test.");
+    recipients = [{ email: to, name: '', token: null }];
+  } else {
+    recipients = ((await db('/subscribers?unsubscribed_at=is.null&select=email,name,token&order=created_at.asc&limit=2000')) ?? [])
+      .filter((r: Row) => EMAIL_RE.test(String(r.email ?? '')));
+    if (!recipients.length) throw new Error("Aucun abonné pour l'instant.");
+  }
+
+  const emails = recipients.map((r) => newsletterEmail(subject, body, p.cta !== false, r, test));
+  let sent = 0;
+  const failed: string[] = [];
+  for (let i = 0; i < emails.length; i += 100) {
+    const chunk = emails.slice(i, i + 100);
+    const prefix = `newsletter/${id}/${test ? 'test' : 'liste'}/${i}`;
+    try {
+      if (chunk.length === 1) await sendEmail(chunk[0], prefix);
+      else await resend('/emails/batch', { method: 'POST', body: chunk, idempotencyKey: `batch-${prefix}` });
+      sent += chunk.length;
+    } catch (e) {
+      const status = (e as { status?: number }).status;
+      // Envoi groupé refusé pour une adresse ou un format : on repasse en envois un par un
+      if (chunk.length > 1 && (status === 400 || status === 422)) {
+        for (let j = 0; j < chunk.length; j++) {
+          try {
+            await sendEmail(chunk[j], `${prefix}/${j}`);
+            sent++;
+          } catch (err) {
+            console.error('newsletter', err);
+            failed.push(chunk[j].to[0]);
+          }
+          await pause(550);
+        }
+      } else {
+        console.error('newsletter', e);
+        failed.push(...chunk.map((m) => m.to[0]));
+      }
+    }
+    if (i + 100 < emails.length) await pause(600);
+  }
+
+  let message = null;
+  if (!test && sent) {
+    const rows = await db('/messages?on_conflict=id', {
+      method: 'POST',
+      prefer: 'resolution=merge-duplicates,return=representation',
+      body: { id, direction: 'out', from_name: 'Presso Center', from_email: FROM_ADDRESS(), to_email: `Lettre · ${sent} abonné${sent > 1 ? 's' : ''}`, subject, body, read: true },
+    });
+    message = rows?.[0] ?? null;
+  }
+  if (!sent) throw new Error("L'envoi a échoué. Réessaie dans quelques minutes.");
+  return { sent, failed: failed.length, total: emails.length, to: test ? recipients[0].email : null, message };
+}
+
 // ---------------------------------------------------------------- Entrée
 Deno.serve(async (req) => {
-  const path = new URL(req.url).pathname.replace(/\/+$/, '');
-  if (path.endsWith('/send') && req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(req) });
-  if (req.method !== 'POST') return json({ error: 'Méthode non autorisée' }, 405);
+  const url = new URL(req.url);
+  const path = url.pathname.replace(/\/+$/, '');
+  // Routes appelées par l'espace de gestion, depuis le navigateur
+  const appRoute = /\/(send|newsletter|push-test)$/.test(path);
+  if (appRoute && req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(req) });
 
   try {
-    if (path.endsWith('/send')) {
-      if (!(await isAdmin(req.headers.get('authorization') ?? ''))) return json({ error: 'Non autorisé' }, 401, cors(req));
+    // Désinscription de la lettre : lien cliqué (GET) ou bouton du logiciel de messagerie (POST)
+    if (path.endsWith('/unsubscribe')) {
+      const token = url.searchParams.get('t') ?? '';
+      if (!UUID_RE.test(token)) return json({ ok: false, error: 'Lien invalide' }, 400);
+      if (req.method === 'GET') return new Response(null, { status: 302, headers: { Location: `${SITE()}/desinscription.html?t=${token}` } });
+      if (req.method !== 'POST') return json({ error: 'Méthode non autorisée' }, 405);
+      const out = await db('/rpc/newsletter_unsubscribe', { method: 'POST', body: { p_token: token } });
+      return json({ ok: !!out?.ok });
+    }
+
+    if (req.method !== 'POST') return json({ error: 'Méthode non autorisée' }, 405);
+
+    if (appRoute) {
+      const user = await adminUser(req.headers.get('authorization') ?? '');
+      if (!user) return json({ error: 'Non autorisé' }, 401, cors(req));
       try {
-        return json({ ok: true, message: await sendFromApp(await req.json()) }, 200, cors(req));
+        const p = await req.json().catch(() => ({}));
+        if (path.endsWith('/send')) return json({ ok: true, message: await sendFromApp(p) }, 200, cors(req));
+        if (path.endsWith('/newsletter')) return json({ ok: true, ...(await sendNewsletter(p, user)) }, 200, cors(req));
+        const result = await pushAll(
+          { title: 'Presso Center', body: 'Les notifications fonctionnent sur cet appareil.', url: `${SITE()}/gestion.html`, tag: 'test' },
+          String(p?.endpoint ?? ''),
+        );
+        return json({ ok: result.sent > 0, ...result }, 200, cors(req));
       } catch (e) {
         console.error(e);
         return json({ error: e instanceof Error ? e.message : String(e) }, 400, cors(req));

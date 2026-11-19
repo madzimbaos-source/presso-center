@@ -72,9 +72,37 @@
 
   render();
 
+  // Un seul accès à la plateforme pour toute la page
+  let store = null;
+  const getStore = () => store || (store = PC.createStore());
+
+  const letter = $('#letter-form');
+  if (letter) {
+    letter.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msg = $('#letter-msg');
+      const say = (text, cls) => {
+        msg.textContent = text;
+        msg.className = 'lp-letter-msg ' + cls;
+      };
+      const email = letter.elements.email.value.trim();
+      if (!PC.isEmail(email)) return say('Vérifie ton adresse e-mail.', 'bad');
+      const btn = letter.querySelector('button');
+      btn.disabled = true;
+      try {
+        await getStore().subscribe({ email, source: 'site' });
+        letter.elements.email.value = '';
+        say('C\'est noté : tu recevras la prochaine lettre.', 'good');
+      } catch (err) {
+        say(err.message || 'Inscription impossible pour le moment.', 'bad');
+      }
+      btn.disabled = false;
+    });
+  }
+
   (async function () {
     try {
-      const store = PC.createStore();
+      const store = getStore();
       info = await store.publicInfo();
       render();
       const now = new Date();

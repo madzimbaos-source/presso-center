@@ -58,6 +58,8 @@ Tout le courrier du domaine passe par Resend.
 - **Envoi depuis l'application** : une réponse ou un nouveau message part au nom de `contact@pressocenter.fr` par la route `/send` de la fonction, qui vérifie que l'appel vient du compte gérant.
 - **Notifications** : à chaque réservation en ligne, le gérant reçoit une alerte et le client un accusé de réception. Quand la demande passe à « confirmée », le client reçoit la confirmation. Une demande de test pilote déclenche aussi une alerte. Le client ne reçoit rien s'il n'a pas indiqué d'e-mail.
 
+- **Modèles** : la fenêtre « Nouveau message » propose une liste « Modèle » (sportifs, clubs et coachs). Les prix viennent des réglages ; ce qui reste à préciser est entre crochets et l'envoi est bloqué tant qu'un crochet subsiste.
+
 Fonctionnement : les déclencheurs de `supabase/mail.sql` appellent la fonction Edge `supabase/functions/mail` (routes `/notify`, `/inbound` et `/send`). La table de la messagerie est créée par `supabase/messages.sql`. L'appel est asynchrone : une erreur d'e-mail ne bloque jamais une réservation.
 
 Réglages, hors du dépôt :
@@ -69,16 +71,31 @@ Réglages, hors du dépôt :
 | Secrets de la fonction | `HOOK_SECRET` | secret partagé avec la base |
 | Secrets de la fonction | `NOTIFY_TO` | boîte qui reçoit les alertes et les transferts |
 | Secrets de la fonction | `MAIL_FROM`, `SITE_URL` | expéditeur et adresse du site |
+| Secrets de la fonction | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_JWK` | clés des notifications push (la publique est aussi dans `assets/config.js`) |
 | Supabase Vault | `presso_mail_url`, `presso_hook_secret` | adresse de la fonction et secret partagé |
 
 DNS : le domaine doit être vérifié chez Resend (DKIM, SPF sur `send`, MX de réception à la racine). Les lignes exactes sont dans Resend → Domains.
 
 Pour diagnostiquer : `select * from net._http_response order by id desc limit 5;` montre les dernières réponses de la fonction.
 
+## Lettre d'information
+
+- **Abonnés** : table `subscribers` (`supabase/newsletter.sql`). On s'inscrit sur la page d'accueil ou en cochant la case à la réservation ; le gérant peut aussi ajouter une personne qui a donné son accord. Rien n'est envoyé au moment de l'inscription.
+- **Envoi** : onglet Messages → Lettre. « M'envoyer un test » n'écrit qu'au gérant ; l'envoi à la liste passe par la route `/newsletter` de la fonction, réservée au compte gérant, par lots de 100. `{prénom}` est remplacé par le prénom de l'abonné.
+- **Désinscription** : chaque lettre contient un lien personnel vers `desinscription.html` (un clic de confirmation sur la page) et l'en-tête `List-Unsubscribe` pour le bouton des messageries (route `/unsubscribe`). Une personne désinscrite ne peut pas être réajoutée à la main.
+
+## Notifications sur le téléphone
+
+L'espace de gestion est installable (`manifest.webmanifest`) et peut envoyer des notifications push : nouvelle demande de réservation, demande de test pilote, message reçu.
+
+- **Activation** : Réglages → Notifications, une fois par appareil. Sur iPhone et iPad, il faut d'abord ajouter l'application à l'écran d'accueil (iOS 16.4 ou plus récent) et l'ouvrir depuis l'icône.
+- **Fonctionnement** : `sw.js` reçoit et affiche les notifications (il ne met rien en cache). Chaque appareil enregistre son abonnement dans `push_subscriptions` (`supabase/push.sql`) ; la fonction `mail` chiffre et signe les envois elle-même (Web Push, clés VAPID). Un abonnement expiré est supprimé automatiquement.
+- **Changer les clés** : générer une nouvelle paire, mettre à jour les deux secrets et `vapidPublicKey` ; chaque appareil doit alors désactiver puis réactiver les notifications.
+
 ## Sécurité
 
 - Toutes les tables sont protégées par RLS. Seul un compte inscrit dans `admins` lit et écrit.
-- Un visiteur n'accède qu'à quatre fonctions : `public_info`, `public_busy`, `book` et `club_request`. Les créneaux occupés sont renvoyés sans nom ni téléphone.
+- Un visiteur n'accède qu'à six fonctions : `public_info`, `public_busy`, `book`, `club_request`, `newsletter_subscribe` et `newsletter_unsubscribe`. Les créneaux occupés sont renvoyés sans nom ni téléphone.
 - `book` revérifie tout côté serveur : formule, horaires (heure de Paris), délai minimum, bottes disponibles, chevauchements, questionnaire de santé, autorisation parentale, longueur des champs et limite de demandes en attente par numéro. Elle calcule aussi le prix.
 
 ## Fichiers
@@ -87,6 +104,8 @@ Pour diagnostiquer : `select * from net._http_response order by id desc limit 5;
 CNAME               domaine servi par GitHub Pages
 index.html          page d'accueil
 mentions-legales.html, confidentialite.html   pages légales
+desinscription.html désinscription de la lettre d'information
+manifest.webmanifest, sw.js   application installable et notifications
 reserver.html       page de réservation
 404.html            page introuvable
 gestion.html        espace de gestion
@@ -97,13 +116,17 @@ assets/
   landing.css       styles de la page d'accueil
   book.js           page de réservation
   admin.js          espace de gestion
+  unsub.js          page de désinscription
+  icons/            icônes de l'application
   styles.css        styles (clair et sombre)
   vendor/           supabase-js 2.45.4 et qrcode-generator 1.4.4 (licence MIT)
 supabase/
   schema.sql        tables, RLS, fonctions
   mail.sql          déclencheurs d'e-mails
   messages.sql      table de la messagerie
-  functions/mail/   fonction Edge : notifications et transfert des e-mails reçus
+  newsletter.sql    abonnés à la lettre, inscription et désinscription
+  push.sql          appareils abonnés aux notifications
+  functions/mail/   fonction Edge : e-mails, lettre d'information, notifications push
   seed.sql          réglages et tarifs du plan, bottes, consommables, partenaires
 ```
 

@@ -76,6 +76,7 @@
     }
     shell();
     route();
+    pushInit();
     window.addEventListener('hashchange', route);
     mq.addEventListener('change', render);
     let rz;
@@ -435,6 +436,7 @@
 
     let h = '<div class="page-head"><div><h1>Bonjour' + (name ? ' ' + esc(name) : '') + '</h1><p>' + esc(PC.capitalize(PC.fmtDayLong(now))) + '</p></div>' +
       '<button class="btn" data-act="new-booking">' + I('plus') + 'Nouvelle séance</button></div>';
+    h += pushHint();
 
     h += '<div class="tiles">' +
       tile('Chiffre d\'affaires de ' + PC.fmtMonth(mk).split(' ')[0].toLowerCase(), PC.eur(ms.ca), fc ? 'Prévu : ' + PC.eur(fc) + ' · ' + pct + ' %' : 'Seuil de rentabilité : ' + PC.eur(S.break_even), fc ? meter(pct, pct >= 100 ? 'good' : pct >= 60 ? '' : 'warn') : '', 'dark') +
@@ -1069,7 +1071,7 @@
       const phone = c.phone;
       body += '<div class="row wrap" style="margin-top:14px">' + (S.packs || []).map((p) => '<button class="btn sm soft" data-act="sell-pack" data-id="' + c.id + '" data-pack="' + p.code + '">' + I('plus') + 'Vendre : ' + esc(p.name) + ' · ' + PC.eur(p.price) + '</button>').join('') +
         '<button class="btn sm soft" data-act="new-booking-for" data-id="' + c.id + '">' + I('calendar') + 'Nouvelle séance</button>' +
-        (c.email ? '<button class="btn sm ghost" data-act="write-client" data-to="' + esc(c.email) + '">' + I('mail') + 'E-mail</button>' : '') +
+        (c.email ? '<button class="btn sm ghost" data-act="write-client" data-id="' + c.id + '" data-to="' + esc(c.email) + '">' + I('mail') + 'E-mail</button>' : '') +
         (phone ? '<a class="btn sm ghost" target="_blank" rel="noopener" href="' + esc(PC.waLink(phone, '')) + '">' + I('message') + 'WhatsApp</a><a class="btn sm ghost" href="tel:' + esc(PC.cleanPhone(phone)) + '">' + I('phone') + 'Appeler</a>' : '') + '</div>';
       const hist = D.bookings.filter((b) => b.client_id === c.id).sort((a, b) => bStart(b) - bStart(a)).slice(0, 12);
       body += '<h3 style="font-size:15px;margin:20px 0 6px">Historique</h3>' + (hist.length ? '<div class="list">' + hist.map((b) => '<div class="li click" data-act="open-booking" data-id="' + b.id + '"><span class="grow"><span class="t">' + esc(PC.capitalize(PC.fmtDay(bStart(b), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }))) + ' · ' + PC.fmtTime(bStart(b)) + '</span><br><span class="s">' + esc(bSub(b)) + ' · ' + PC.eur(b.price) + '</span></span>' + statusBadge(b) + '</div>').join('') + '</div>' : '<p class="muted small">Aucune séance.</p>');
@@ -1261,11 +1263,13 @@
     const all = (D.messages || []).slice().sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
     const list = all.filter((m) => m.direction === tab);
     const unread = unreadCount();
+    const subCount = activeSubscribers().length;
     let h = '<div class="page-head"><div><h1>Messages</h1><p>' + CONTACT_EMAIL + ' · ' + (unread ? unread + ' non lu' + (unread > 1 ? 's' : '') : 'tout est lu') + '</p></div><button class="btn" data-act="new-message">' + I('plus') + 'Nouveau message</button></div>';
-    h += '<div class="toolbar"><div class="seg" role="group"><button data-act="msg-tab" data-id="in" aria-pressed="' + (tab === 'in') + '">Reçus</button><button data-act="msg-tab" data-id="out" aria-pressed="' + (tab === 'out') + '">Envoyés</button></div><span class="grow"></span><button class="btn sm ghost" data-act="refresh-messages">' + I('refresh') + 'Actualiser</button></div>';
+    h += '<div class="toolbar"><div class="seg" role="group"><button data-act="msg-tab" data-id="in" aria-pressed="' + (tab === 'in') + '">Reçus</button><button data-act="msg-tab" data-id="out" aria-pressed="' + (tab === 'out') + '">Envoyés</button><button data-act="msg-tab" data-id="lettre" aria-pressed="' + (tab === 'lettre') + '">Lettre' + (subCount ? ' · ' + subCount : '') + '</button></div><span class="grow"></span><button class="btn sm ghost" data-act="refresh-messages">' + I('refresh') + 'Actualiser</button></div>';
+    if (tab === 'lettre') return h + viewLetter();
     if (!list.length) return h + '<div class="empty">' + (tab === 'in' ? 'Aucun message reçu pour le moment. Les e-mails envoyés à ' + CONTACT_EMAIL + ' apparaîtront ici.' : 'Aucun message envoyé.') + '</div>';
     h += '<div class="card flat" style="padding:4px 10px"><div class="list">' + list.map((m) => {
-      const who = tab === 'in' ? (m.from_name || m.from_email || 'Inconnu') : 'À : ' + (m.to_email || '');
+      const who = tab === 'in' ? (m.from_name || m.from_email || 'Inconnu') : (isLetter(m) ? '' : 'À : ') + (m.to_email || '');
       const fresh = tab === 'in' && !m.read;
       const snippet = String(m.body || '').replace(/\s+/g, ' ').slice(0, 110);
       return '<div class="li click msg' + (fresh ? ' unread' : '') + '" data-act="open-message" data-id="' + m.id + '" role="button" tabindex="0">' +
@@ -1321,7 +1325,7 @@
     if (incoming) {
       body += '<form id="reply-form" class="stack" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--line)"><label class="field"><span>Répondre à ' + esc(m.from_email || '') + '</span><textarea name="body" rows="6" required placeholder="Ta réponse…"></textarea><small>Envoyé au nom de ' + CONTACT_EMAIL + '. La réponse du client reviendra ici.</small></label><p class="form-error hide" id="reply-error" role="alert"></p></form>';
     }
-    modal({ title: m.subject || '(sans objet)', body, wide: true, foot: '<button class="btn danger" data-act="delete-message" data-id="' + m.id + '">Supprimer</button><button class="btn ghost" data-close>Fermer</button>' + (incoming ? '<button class="btn" type="submit" form="reply-form">' + I('send') + 'Envoyer</button>' : '') });
+    modal({ title: m.subject || '(sans objet)', body, wide: true, foot: '<button class="btn danger" data-act="delete-message" data-id="' + m.id + '">Supprimer</button><button class="btn ghost" data-close>Fermer</button>' + (incoming ? '<button class="btn soft" data-act="reply-template" data-id="' + m.id + '">Modèles</button><button class="btn" type="submit" form="reply-form">' + I('send') + 'Envoyer</button>' : '') });
     if (incoming && !m.read) run(() => patch('messages', m.id, { read: true }));
     const form = $('#reply-form');
     if (form) form.addEventListener('submit', (e) => {
@@ -1331,18 +1335,444 @@
     });
   }
 
-  function composeMessage(defaults) {
-    const d = Object.assign({ to: '', subject: '', body: '' }, defaults || {});
-    const body = '<form id="compose-form" class="stack"><label class="field"><span>Destinataire</span><input type="email" name="to" required value="' + esc(d.to) + '" placeholder="prenom@exemple.fr"></label>' +
+  /* ---------- Modèles d'e-mails ----------
+     Tutoiement pour les sportifs, vouvoiement pour les clubs et les coachs.
+     Les prix viennent des réglages. Ce qui n'est pas connu reste entre crochets :
+     l'envoi est bloqué tant qu'un passage entre crochets n'est pas complété. */
+  const PLACEHOLDER_RE = /\[[^\]\n]{1,60}\]/;
+  function mailTemplates(ctx) {
+    ctx = ctx || {};
+    const b = ctx.booking || null;
+    const c = ctx.client || (b && clientById(b.client_id)) || null;
+    const p = ctx.partner || (b && partnerById(b.partner_id)) || null;
+    const brand = S.business_name || 'Presso Center';
+    const firstOf = (v) => String(v || '').trim().split(/\s+/)[0];
+    const first = firstOf((b && b.client_name) || (c && c.name)) || '[prénom]';
+    const contact = firstOf(p && p.contact_name);
+    const club = (p && p.name) || '[nom de la structure]';
+    const s = b ? bStart(b) : null;
+    const when = s ? PC.fmtDayLong(s) + ' à ' + PC.fmtTime(s) : '[date et heure]';
+    const sv = b ? PC.service(S, b.service) : null;
+    const seance = 'séance' + (sv ? ' ' + sv.name : '');
+    const where = b && b.kind === 'domicile' ? 'chez toi' + (b.address ? ' (' + b.address + ')' : '') : (S.reception_address || '[adresse d\'accueil]');
+    const price = b && Number(b.price) > 0 ? PC.eur(b.price) : '[montant]';
+    const url = bookingUrl();
+    const site = url.replace(/reserver\.html.*$/, '');
+    const helloTu = 'Bonjour ' + first + ',\n\n';
+    const helloVous = 'Bonjour' + (contact ? ' ' + contact : '') + ',\n\n';
+    const signTu = '\n\nÀ bientôt,\n' + brand;
+    const signVous = '\n\nBien cordialement,\n' + brand + '\n' + CONTACT_EMAIL + (S.phone ? ' · ' + S.phone : '');
+    const cap = PC.capacity(D.equipment) || 5;
+    const plans = S.club_plans || [];
+    const plan = p ? plans.find((x) => x.code === p.plan) : null;
+    const planLine = (x) => '- ' + x.name + ' : ' + PC.eur(x.price) + ' par mois · ' + x.desc;
+    const minPlan = plans.length ? plans.reduce((a, x) => (Number(x.price) < Number(a.price) ? x : a)) : null;
+    const discount = Math.round((Number(S.season_discount) || 0) * 100);
+    const packs = S.packs || [];
+    const card = packs.find((x) => Number(x.credits) >= 10) || null;
+    const cardLine = card ? 'Bon à savoir : ' + card.name + ' à ' + PC.eur(card.price) + ', soit ' + PC.eur(PC.round2(card.price / card.credits)) + ' la séance.' : '';
+    const duo = (S.services || []).find((x) => x.per_person);
+    const solo = duo ? (S.services || []).find((x) => !x.per_person && x.kind === 'seance' && x.duration === duo.duration) : null;
+    const eventOpt = (S.club_options || []).find((o) => /v[ée]nement|tournoi/i.test(o.name));
+    const options = (S.club_options || []).map((o) => '- ' + o.name + ' : ' + PC.eur(o.price)).join('\n');
+    const mk = PC.monthKey(new Date());
+    const month = PC.fmtMonth(mk).toLowerCase();
+    const stats = (key) => {
+      if (!p) return null;
+      const list = D.bookings.filter((x) => x.partner_id === p.id && x.status === 'terminee' && (!key || PC.ymd(bStart(x)).startsWith(key)));
+      return { slots: list.length, passages: sum(list, (x) => x.passages) };
+    };
+    const count = (st) => (st && st.slots ? st.slots + ' créneau' + (st.slots > 1 ? 'x' : '') + ' et ' + st.passages + ' passage' + (st.passages > 1 ? 's' : '') : '[nombre] créneaux et [nombre] passages');
+    const pilotEnd = p && p.pilot_end ? 'le ' + PC.fmtDate(p.pilot_end) : '[date de fin]';
+    const T = [];
+    const add = (group, id, label, subject, body) => T.push({ group, id, label, subject, body });
+
+    /* ----- Sportifs ----- */
+    add('Sportifs', 'confirmation', 'Séance confirmée', 'Ta séance du ' + when + ' est confirmée',
+      helloTu + 'Ta ' + seance + ' du ' + when + ' est confirmée.\n\nLieu : ' + where + '\nPrix : ' + price + (b && b.payment_mode === 'credit' ? ' (carte ou abonnement)' : ' à régler sur place') +
+      '\n\nPrévois une tenue confortable, short ou legging. Un empêchement ? Préviens-nous au moins 12 h avant.' + signTu);
+    add('Sportifs', 'autre-creneau', 'Proposer un autre créneau', 'Ta demande de séance du ' + when,
+      helloTu + 'Malheureusement, le créneau du ' + when + ' n\'est plus disponible. Tu peux en choisir un autre ici : ' + url + signTu);
+    add('Sportifs', 'rappel', 'Rappel la veille de la séance', 'Rappel : ta séance du ' + when,
+      helloTu + 'Petit rappel : ta ' + seance + ' est prévue le ' + when + '.\n\nLieu : ' + where + '\n\nPense à bien t\'hydrater avant de venir. Un empêchement ? Préviens-nous dès que possible.' + signTu);
+    add('Sportifs', 'premiere-seance', 'Avant la première séance', 'Ta première séance de pressothérapie : ce qu\'il faut savoir',
+      helloTu + 'Ta première séance approche. Voici comment elle se passe :\n\n- Tu t\'installes et on t\'aide à enfiler les bottes. Elles se gonflent ensuite par séquences, des pieds vers les cuisses.\n- La séance dure de 30 à 60 minutes selon la formule. Tu peux lire, écouter de la musique ou simplement te détendre.\n- Prévois une tenue confortable, short ou legging, et bois de l\'eau avant et après.\n\n' +
+      'La pressothérapie est déconseillée dans certains cas :\n' + PC.CONTRAINDICATIONS.map((x) => '- ' + x).join('\n') + '\n\nSi l\'une de ces situations te concerne, ou en cas de doute, demande l\'avis de ton médecin et préviens-nous avant la séance.\n\nLe règlement se fait sur place.' + signTu);
+    add('Sportifs', 'merci', 'Merci après la séance', 'Merci pour ta séance',
+      helloTu + 'Merci pour ta séance. On espère que tes jambes sont plus légères.\n\nPour en tirer le meilleur : bois de l\'eau dans les heures qui suivent, et prévois une séance après tes entraînements les plus durs ou tes compétitions.\n\nTu peux réserver la prochaine ici : ' + url + (cardLine ? '\n\n' + cardLine : '') + signTu);
+    add('Sportifs', 'relance', 'Relance après quelques semaines', 'Des jambes lourdes en ce moment ?',
+      helloTu + 'Cela fait quelques semaines qu\'on ne t\'a pas vu. Si tes entraînements ont repris ou si une compétition approche, une séance de récupération peut t\'aider à enchaîner.\n\nLes prochains créneaux sont ici : ' + url + (cardLine ? '\n\n' + cardLine : '') + signTu);
+    add('Sportifs', 'carte', 'Carte et abonnement', 'Récupérer régulièrement, pour moins cher',
+      helloTu + 'Si tu viens régulièrement, deux formules reviennent moins cher que la séance à l\'unité :\n\n' + packs.map((x) => '- ' + x.name + ' : ' + PC.eur(x.price) + ' · ' + x.desc).join('\n') +
+      '\n\nElles se règlent sur place, lors de ta prochaine séance. Réponds à cet e-mail si tu veux qu\'on te la prépare.' + signTu);
+    add('Sportifs', 'reglement', 'Rappel de règlement', 'Règlement de ta séance du ' + when,
+      helloTu + 'Sauf erreur de notre part, ta ' + seance + ' du ' + when + ' (' + price + ') n\'a pas encore été réglée.\n\nTu peux la régler lors de ton prochain passage, ou nous répondre pour convenir d\'un autre moyen.\n\nMerci et à bientôt,\n' + brand);
+    add('Sportifs', 'report', 'Séance à déplacer (de notre fait)', 'Ta séance du ' + when + ' doit être déplacée',
+      helloTu + 'On est désolés : on ne pourra pas assurer ta ' + seance + ' du ' + when + '.\n\nTu peux choisir un autre créneau ici : ' + url + '\nOu réponds à cet e-mail avec tes disponibilités, on s\'occupe de la déplacer.\n\nMerci de ta compréhension,\n' + brand);
+
+    /* ----- Clubs et coachs ----- */
+    add('Clubs et coachs', 'club-contact', 'Premier contact · club', 'Récupération sportive pour les licenciés de ' + club,
+      helloVous + brand + ' propose aux clubs de Tours un service de récupération par pressothérapie : des bottes de compression, utilisées dans le sport de haut niveau, que l\'on installe directement dans vos locaux après l\'entraînement ou le match.\n\nConcrètement :\n- on s\'installe en 10 minutes dans un vestiaire ou une salle, le club n\'achète aucun matériel ;\n- jusqu\'à ' + cap * 2 + ' sportifs passent par heure, par séances de 25 minutes ;' +
+      (minPlan ? '\n- les forfaits démarrent à ' + PC.eur(minPlan.price) + ' par mois, soit environ ' + PC.eur(PC.round2(minPlan.price / (minPlan.passages || 1))) + ' par passage.' : '') +
+      '\n\nPour vous permettre de juger sur pièces, on vous propose un test pilote gratuit de 2 à 4 semaines.\n\nSeriez-vous disponible pour un échange de 15 minutes cette semaine ?' + signVous);
+    add('Clubs et coachs', 'club-pilote', 'Proposition de test pilote · club', 'Test pilote gratuit pour ' + club,
+      helloVous + 'Merci pour votre intérêt. Voici comment se déroule le test pilote que l\'on vous propose :\n\n- Durée : 2 à 4 semaines, sans frais et sans engagement.\n- Rythme : un créneau d\'1h30 par semaine, après un entraînement ou un match, dans vos locaux.\n- Capacité : environ ' + cap * 3 + ' passages par créneau, par séances de 25 minutes.\n- Matériel : on apporte tout, avec des sous-bottes à usage unique et une désinfection entre chaque passage.\n- Sécurité : un court questionnaire de santé à la première séance, et une autorisation parentale pour les mineurs.\n\n' +
+      'À la fin du pilote, on vous remet un bilan de fréquentation : nombre de créneaux, de passages et coût par passage. Vous décidez alors librement de la suite.\n\nQuels jours et quels horaires vous conviendraient pour démarrer ?' + signVous);
+    add('Clubs et coachs', 'coach-pilote', 'Proposition de test pilote · coach', 'Récupération pour vos sportifs : test pilote gratuit',
+      helloVous + brand + ' propose des séances de récupération par pressothérapie à Tours. Ce service peut compléter votre accompagnement : vos sportifs récupèrent mieux entre deux séances, et vous leur apportez un plus sans investir dans le matériel.\n\nOn vous propose un test pilote gratuit de 2 à 4 semaines avec vos sportifs, sur un créneau à convenir, dans votre salle ou chez nous.' +
+      (duo ? '\n\nEnsuite, vos groupes bénéficient du tarif « ' + duo.name + ' » : ' + PC.eur(duo.price) + ' par personne pour ' + PC.durationLabel(duo.duration) + (solo ? ', au lieu de ' + PC.eur(solo.price) + ' en séance individuelle' : '') + '.' : '') +
+      '\n\nQuand seriez-vous disponible pour en parler ?' + signVous);
+    add('Clubs et coachs', 'pilote-organisation', 'Organisation du test pilote', 'Votre test pilote : organisation',
+      helloVous + 'Voici l\'organisation que l\'on vous propose pour le test pilote :\n\n- Période : du ' + (p && p.pilot_start ? PC.fmtDate(p.pilot_start) : '[date de début]') + ' au ' + (p && p.pilot_end ? PC.fmtDate(p.pilot_end) : '[date de fin]') + '\n- Créneau : ' + ((p && p.slot_info) || '[jour et horaire]') + '\n- Lieu : ' + ((p && p.location) || '[lieu]') +
+      '\n\nDe votre côté, il suffit de prévoir un vestiaire ou une salle avec quelques assises, et de prévenir vos sportifs. On leur fait remplir un court questionnaire de santé à la première séance ; pour les mineurs, une autorisation parentale est nécessaire.\n\nPouvez-vous nous confirmer que cette organisation vous convient ?' + signVous);
+    add('Clubs et coachs', 'pilote-bilan', 'Fin de pilote : bilan et suite', 'Bilan du test pilote et proposition pour la suite',
+      helloVous + 'Le test pilote se termine ' + pilotEnd + '. Merci pour votre accueil.\n\nEn résumé : ' + count(stats()) + ' sur la période. Le bilan de fréquentation détaillé vous est envoyé séparément.\n\nPour continuer, on vous propose l\'un de nos forfaits mensuels :\n' + plans.map(planLine).join('\n') +
+      '\n\nLes conditions restent simples : sans engagement, avec un préavis de 15 jours' + (discount ? ', et ' + discount + ' % de remise si vous vous engagez sur la saison' : '') + '.\n\nQuel forfait correspondrait le mieux à vos équipes ? On peut en parler de vive voix quand vous voulez.' + signVous);
+    add('Clubs et coachs', 'club-contrat', 'Proposition de contrat · club', 'Proposition de forfait pour ' + club,
+      helloVous + 'Suite à nos échanges, voici notre proposition pour ' + club + ' :\n\n' + (plan ? 'Forfait ' + plan.name + ' : ' + PC.eur(plan.price) + ' par mois\n' + plan.desc : 'Forfait [forfait retenu] parmi :\n' + plans.map(planLine).join('\n')) +
+      '\n\nCe qui est compris :\n- l\'installation et le rangement du matériel à chaque créneau ;\n- les sous-bottes à usage unique et la désinfection entre chaque passage ;\n- un bilan de fréquentation chaque mois.\n\nConditions :\n- facturation mensuelle au club ;\n- sans engagement, avec un préavis de 15 jours ;' +
+      (discount ? '\n- ' + discount + ' % de remise pour un engagement sur la saison' + (plan ? ', soit ' + PC.eur(PC.round2(plan.price * (1 - S.season_discount))) + ' par mois' : '') + '.' : '') +
+      (options ? '\n\nOptions à la demande :\n' + options : '') +
+      '\n\nSi cela vous convient, répondez simplement à cet e-mail avec le forfait retenu et la date de démarrage souhaitée : on vous envoie la confirmation écrite et on cale le premier créneau.' + signVous);
+    add('Clubs et coachs', 'coach-contrat', 'Proposition de partenariat · coach', 'Proposition de partenariat ' + brand,
+      helloVous + 'Suite à nos échanges, voici ce que l\'on vous propose :\n\n- Vos sportifs réservent leurs séances en ligne, aux créneaux ouverts : ' + url +
+      (duo ? '\n- En groupe de ' + (duo.min_people || 2) + ' à ' + (duo.max_people || 5) + ', ils bénéficient du tarif « ' + duo.name + ' » : ' + PC.eur(duo.price) + ' par personne pour ' + PC.durationLabel(duo.duration) + '.' : '') +
+      (packs.length ? '\n- Pour un suivi régulier : ' + packs.map((x) => x.name + ' à ' + PC.eur(x.price)).join(', ') + '.' : '') +
+      '\n- Pour un créneau dédié dans votre salle, on établit un devis selon le nombre de sportifs.\n\nDe votre côté, vous recommandez ' + brand + ' à vos sportifs quand la récupération peut les aider. Aucun engagement de volume, aucun frais pour vous.\n\nSi cela vous convient, on peut démarrer dès [date de démarrage].' + signVous);
+    add('Clubs et coachs', 'evenement', 'Proposition pour un événement', 'Espace récupération pour [nom de l\'événement]',
+      helloVous + 'Pour [nom de l\'événement], ' + brand + ' peut installer un espace de récupération pour les participants : des bottes de pressothérapie, par séances de 20 à 25 minutes après l\'effort.\n\n' +
+      (eventOpt ? '- Formule : ' + eventOpt.name.charAt(0).toLowerCase() + eventOpt.name.slice(1) + ', ' + PC.eur(eventOpt.price) + ' tout compris (installation, matériel, hygiène).\n' : '') +
+      '- Capacité : environ ' + cap * 2 + ' passages par heure.\n- Besoin sur place : un espace abrité de quelques mètres carrés, avec des assises. Les bottes sont sans fil.\n\nSouhaitez-vous que l\'on en discute ?' + signVous);
+    add('Clubs et coachs', 'club-relance', 'Relance sans réponse', 'Test pilote ' + brand + ' : toujours d\'actualité ?',
+      helloVous + 'On se permet de revenir vers vous au sujet du test pilote gratuit que l\'on vous a proposé.\n\nSi le moment n\'est pas le bon, dites-le-nous simplement : on reviendra vers vous plus tard dans la saison. Sinon, un échange de 15 minutes suffit pour caler un premier créneau.' + signVous);
+    add('Clubs et coachs', 'bilan-mensuel', 'Bilan mensuel de fréquentation', 'Bilan de ' + month + ' · ' + club,
+      helloVous + 'Voici le bilan de ' + month + ' pour ' + club + ' : ' + count(stats(mk)) + '. Le détail vous est envoyé séparément.\n\nSi vous souhaitez ajuster les jours ou les horaires pour le mois prochain, dites-le-nous.' + signVous);
+    add('Clubs et coachs', 'forfait-mois', 'Forfait du mois', 'Forfait de ' + month + ' · ' + club,
+      helloVous + 'Le forfait ' + (plan ? plan.name + ' ' : '') + 'de ' + month + ' s\'élève à ' + (p && Number(p.monthly_price) > 0 ? PC.eur(p.monthly_price) : '[montant]') + '. La facture vous est envoyée séparément.\n\nMerci de votre confiance.' + signVous);
+    return T;
+  }
+
+  // Modèles de lettre d'information (tutoiement). « {prénom} » est remplacé à l'envoi.
+  function letterTemplates() {
+    const brand = S.business_name || 'Presso Center';
+    const url = bookingUrl();
+    const sign = '\n\nÀ bientôt,\n' + brand;
+    const services = (S.services || []).filter((x) => x.online !== false);
+    const card = (S.packs || []).find((x) => Number(x.credits) >= 10) || null;
+    const cardLine = card ? card.name + ' à ' + PC.eur(card.price) + ', soit ' + PC.eur(PC.round2(card.price / card.credits)) + ' la séance' : '';
+    return [
+      { id: 'lancement', label: 'Lettre de lancement (futurs clients)', subject: 'La récupération sportive arrive à Tours',
+        body: 'Bonjour {prénom},\n\n' + brand + ' ouvre ses créneaux de récupération sportive à Tours.\n\nLe principe : des bottes de pressothérapie, utilisées par les sportifs de haut niveau, qui compriment les jambes par séquences, des pieds vers les cuisses. L\'objectif : des jambes plus légères après l\'effort et une meilleure récupération entre deux entraînements.\n\nComment ça se passe :\n- tu réserves en ligne, en une minute ;\n- tu viens après ton entraînement ou ta compétition ;\n- tu t\'installes 30 à 60 minutes, et tu repars.\n\nLes formules :\n' +
+          services.map((x) => '- ' + x.name + ' : ' + PC.eur(x.price) + (x.per_person ? ' par personne' : '') + ' · ' + PC.durationLabel(x.duration)).join('\n') + (cardLine ? '\n- ' + cardLine : '') +
+          '\n\nLes créneaux se réservent ici : ' + url + '\n\nTu es coach ou tu fais partie d\'un club ? Réponds à cet e-mail : on propose un test pilote gratuit de 2 à 4 semaines.' + sign },
+      { id: 'conseil', label: 'Conseil : récupérer après une compétition', subject: '3 réflexes pour mieux récupérer après une compétition',
+        body: 'Bonjour {prénom},\n\nAprès une compétition, la récupération commence dès la ligne d\'arrivée. Trois réflexes simples :\n\n1. Bois régulièrement dans les heures qui suivent, sans attendre d\'avoir soif.\n2. Marche ou pédale tranquillement une dizaine de minutes plutôt que de t\'arrêter net.\n3. Dors : c\'est pendant le sommeil que le corps récupère le plus.\n\nBeaucoup de sportifs y ajoutent une séance de pressothérapie dans les 48 heures, pour retrouver des jambes légères.\n\nLes créneaux de la semaine sont en ligne : ' + url + sign },
+      { id: 'mois', label: 'Lettre du mois (à compléter)', subject: 'Récupération : le conseil du mois',
+        body: 'Bonjour {prénom},\n\nLe conseil du mois : [ton conseil de récupération, en deux ou trois phrases].\n\nLes créneaux ouverts ce mois-ci : [jours et horaires]. Ils se réservent ici : ' + url + (cardLine ? '\n\nL\'offre du moment : ' + cardLine + '.' : '') + sign },
+      { id: 'creneaux', label: 'Nouveaux créneaux ouverts', subject: 'De nouveaux créneaux sont ouverts',
+        body: 'Bonjour {prénom},\n\nDe nouveaux créneaux viennent d\'ouvrir : [jours et horaires].\n\nPense à réserver tôt si tu as une compétition ce week-end : ' + url + sign }
+    ];
+  }
+
+  // Premier passage entre crochets restant, ou '' : l'envoi attend qu'il soit complété
+  const pendingPlaceholder = (...texts) => {
+    for (const t of texts) {
+      const m = PLACEHOLDER_RE.exec(String(t || ''));
+      if (m) return m[0];
+    }
+    return '';
+  };
+  // Liste « Modèle » d'un formulaire : remplit l'objet et le texte, sans écraser une saisie sans prévenir
+  function bindTemplates(form, templates, opts) {
+    const select = form.elements.tpl;
+    const subject = form.elements.subject;
+    const body = form.elements.body;
+    let filled = body.value;
+    select.addEventListener('change', () => {
+      const t = templates.find((x) => x.id === select.value);
+      if (!t) return;
+      if (body.value.trim() && body.value !== filled && !window.confirm('Remplacer le message en cours par ce modèle ?')) {
+        select.value = '';
+        return;
+      }
+      if (!(opts && opts.keepSubject)) subject.value = t.subject;
+      body.value = filled = t.body;
+      body.scrollTop = 0;
+    });
+  }
+
+  function composeMessage(defaults, ctx) {
+    const d = Object.assign({ to: '', subject: '', body: '', reply_to_id: null }, defaults || {});
+    const tpls = mailTemplates(ctx);
+    // les modèles « clubs » d'abord quand on écrit à un club
+    const groups = ctx && ctx.partner && !ctx.booking ? ['Clubs et coachs', 'Sportifs'] : ['Sportifs', 'Clubs et coachs'];
+    const options = groups.map((g) => '<optgroup label="' + g + '">' + tpls.filter((t) => t.group === g).map((t) => '<option value="' + t.id + '">' + esc(t.label) + '</option>').join('') + '</optgroup>').join('');
+    const body = '<form id="compose-form" class="stack">' +
+      '<label class="field"><span>Modèle</span><select name="tpl"><option value="">Aucun modèle (message libre)</option>' + options + '</select><small>Le modèle remplit l\'objet et le message. Complète les passages entre crochets avant d\'envoyer.</small></label>' +
+      '<label class="field"><span>Destinataire</span><input type="email" name="to" required value="' + esc(d.to) + '" placeholder="prenom@exemple.fr"></label>' +
       '<label class="field"><span>Objet</span><input name="subject" required maxlength="300" value="' + esc(d.subject) + '"></label>' +
-      '<label class="field"><span>Message</span><textarea name="body" rows="8" required>' + esc(d.body) + '</textarea><small>Envoyé au nom de ' + CONTACT_EMAIL + '.</small></label><p class="form-error hide" id="compose-error" role="alert"></p></form>';
-    modal({ title: 'Nouveau message', body, wide: true, foot: '<button class="btn ghost" data-close>Annuler</button><button class="btn" type="submit" form="compose-form">' + I('send') + 'Envoyer</button>' });
+      '<label class="field"><span>Message</span><textarea name="body" rows="10" required>' + esc(d.body) + '</textarea><small>Envoyé au nom de ' + CONTACT_EMAIL + '.</small></label><p class="form-error hide" id="compose-error" role="alert"></p></form>';
+    modal({ title: d.reply_to_id ? 'Répondre avec un modèle' : 'Nouveau message', body, wide: true, foot: '<button class="btn ghost" data-close>Annuler</button><button class="btn" type="submit" form="compose-form">' + I('send') + 'Envoyer</button>' });
     const form = $('#compose-form');
+    bindTemplates(form, tpls, { keepSubject: !!d.reply_to_id });
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       const f = new FormData(form);
-      sendMessage({ to: String(f.get('to') || '').trim(), subject: String(f.get('subject') || '').trim(), body: String(f.get('body') || '').trim() }, form, $('#compose-error'));
+      const p = { to: String(f.get('to') || '').trim(), subject: String(f.get('subject') || '').trim(), body: String(f.get('body') || '').trim() };
+      if (d.reply_to_id) p.reply_to_id = d.reply_to_id;
+      const err = $('#compose-error');
+      const todo = pendingPlaceholder(p.subject, p.body);
+      if (todo) {
+        err.textContent = 'Il reste un passage entre crochets à compléter : ' + todo;
+        err.classList.remove('hide');
+        return;
+      }
+      sendMessage(p, form, err);
     });
+  }
+
+  /* ---------- Lettre d'information ---------- */
+  const SUB_SOURCES = { site: 'Inscrit sur le site', reservation: 'Inscrit à la réservation', manuel: 'Ajouté par toi' };
+  const activeSubscribers = () => (D.subscribers || []).filter((x) => !x.unsubscribed_at);
+  const isLetter = (m) => m.direction === 'out' && /^Lettre · /.test(m.to_email || '');
+
+  function viewLetter() {
+    const subs = (D.subscribers || []).slice().sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    const active = subs.filter((x) => !x.unsubscribed_at);
+    const letters = (D.messages || []).filter(isLetter).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    const last = letters[0];
+    let h = '<div class="tiles" style="grid-template-columns:repeat(3,minmax(0,1fr))">' +
+      tile('Abonnés', String(active.length), 'Ils reçoivent la lettre', '', 'dark') +
+      tile('Désinscrits', String(subs.length - active.length), 'Ils ne reçoivent plus rien') +
+      tile('Dernière lettre', last ? esc(msgWhen(last.created_at)) : 'Aucune', last ? esc(last.subject || '') : 'Écris la première') + '</div>';
+    h += '<div class="row wrap" style="margin:14px 0"><button class="btn" data-act="new-letter">' + I('send') + 'Écrire une lettre</button><button class="btn ghost" data-act="new-subscriber">' + I('plus') + 'Ajouter un abonné</button></div>';
+    if (active.length > 90) h += '<div class="alert warn">' + I('alert') + '<span>Plus de 90 abonnés : l\'offre gratuite du service d\'envoi est limitée à 100 e-mails par jour. Au-delà, il faut passer à l\'offre payante.</span></div>';
+    h += '<div class="card flat" style="padding:4px 10px"><div class="list">' + (subs.length ? subs.map((x) => {
+      const off = !!x.unsubscribed_at;
+      return '<div class="li"><span class="grow"><span class="t" style="word-break:break-all">' + esc(x.email) + '</span>' + (x.name ? ' <span class="s">· ' + esc(x.name) + '</span>' : '') + (off ? ' <span class="badge plain">Désinscrit</span>' : '') +
+        '<br><span class="s">' + esc(SUB_SOURCES[x.source] || '') + ' · ' + esc(PC.fmtDay(new Date(x.created_at), { day: 'numeric', month: 'short', year: 'numeric' })) + '</span></span>' +
+        '<button class="btn icon sm ghost" data-act="delete-subscriber" data-id="' + x.id + '" aria-label="Retirer ' + esc(x.email) + '">' + I('trash') + '</button></div>';
+    }).join('') : '<div class="empty">Aucun abonné pour le moment. Les inscriptions viennent du site et de la case à cocher à la réservation.</div>') + '</div></div>';
+    h += '<p class="small muted" style="margin-top:10px">Chaque lettre contient un lien de désinscription. N\'ajoute à la main que des personnes qui t\'ont donné leur accord.</p>';
+    return h;
+  }
+
+  function composeLetter() {
+    const n = activeSubscribers().length;
+    const tpls = letterTemplates();
+    const id = PC.uid();
+    const body = '<form id="letter-form" class="stack">' +
+      '<label class="field"><span>Modèle</span><select name="tpl"><option value="">Aucun modèle (lettre libre)</option>' + tpls.map((t) => '<option value="' + t.id + '">' + esc(t.label) + '</option>').join('') + '</select></label>' +
+      '<label class="field"><span>Objet</span><input name="subject" required maxlength="200"></label>' +
+      '<label class="field"><span>Lettre</span><textarea name="body" rows="12" required></textarea><small>« {prénom} » est remplacé par le prénom de chaque abonné. Le lien de désinscription est ajouté automatiquement.</small></label>' +
+      '<label class="check"><input type="checkbox" name="cta" checked><span>Ajouter le bouton « Réserver une séance »</span></label>' +
+      '<p class="form-error hide" id="letter-error" role="alert"></p></form>';
+    modal({ title: 'Écrire une lettre', body, wide: true, foot: '<button class="btn ghost" data-close>Annuler</button><button class="btn soft" type="button" id="letter-test">M\'envoyer un test</button><button class="btn" type="submit" form="letter-form"' + (n ? '' : ' disabled') + '>' + I('send') + (n ? 'Envoyer à ' + n + ' abonné' + (n > 1 ? 's' : '') : 'Aucun abonné') + '</button>' });
+    const form = $('#letter-form');
+    const err = $('#letter-error');
+    bindTemplates(form, tpls);
+    const send = async (test) => {
+      const f = new FormData(form);
+      const p = { id, subject: String(f.get('subject') || '').trim(), body: String(f.get('body') || '').trim(), cta: !!f.get('cta'), test };
+      err.classList.add('hide');
+      if (!form.reportValidity()) return;
+      const todo = pendingPlaceholder(p.subject, p.body);
+      if (todo) {
+        err.textContent = 'Il reste un passage entre crochets à compléter : ' + todo;
+        err.classList.remove('hide');
+        return;
+      }
+      if (!test && !window.confirm('Envoyer cette lettre à ' + n + ' abonné' + (n > 1 ? 's' : '') + ' ? Une fois partie, elle ne peut pas être rappelée.')) return;
+      const buttons = $$('.modal-foot button');
+      buttons.forEach((x) => (x.disabled = true));
+      try {
+        const out = await store.sendNewsletter(p);
+        if (test) {
+          PC.toast('Test envoyé à ' + (out.to || 'ton adresse'));
+          buttons.forEach((x) => (x.disabled = false));
+          return;
+        }
+        if (out.message) {
+          D.messages = (D.messages || []).filter((x) => x.id !== out.message.id);
+          D.messages.push(out.message);
+        }
+        closeModal();
+        PC.toast('Lettre envoyée à ' + out.sent + ' abonné' + (out.sent > 1 ? 's' : '') + (out.failed ? ' · ' + out.failed + ' échec' + (out.failed > 1 ? 's' : '') : ''), out.failed ? 'bad' : undefined);
+        render();
+      } catch (e) {
+        err.textContent = e.message || 'Envoi impossible.';
+        err.classList.remove('hide');
+        buttons.forEach((x) => (x.disabled = false));
+      }
+    };
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      send(false);
+    });
+    $('#letter-test').addEventListener('click', () => send(true));
+  }
+
+  function subscriberDialog() {
+    const body = '<form id="sub-form" class="stack"><label class="field"><span>Adresse e-mail</span><input type="email" name="email" required maxlength="160" placeholder="prenom@exemple.fr"></label>' +
+      '<label class="field"><span>Prénom (facultatif)</span><input name="name" maxlength="120"></label>' +
+      '<p class="small muted">N\'ajoute que des personnes qui ont accepté de recevoir la lettre. Elles pourront se désinscrire en un clic.</p><p class="form-error hide" id="sub-error" role="alert"></p></form>';
+    modal({ title: 'Ajouter un abonné', body, foot: '<button class="btn ghost" data-close>Annuler</button><button class="btn" type="submit" form="sub-form">Ajouter</button>' });
+    const form = $('#sub-form');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = new FormData(form);
+      const email = String(f.get('email') || '').trim().toLowerCase();
+      const err = $('#sub-error');
+      const fail = (msg) => {
+        err.textContent = msg;
+        err.classList.remove('hide');
+      };
+      if (!PC.isEmail(email)) return fail('Adresse e-mail invalide.');
+      const known = (D.subscribers || []).find((x) => String(x.email).toLowerCase() === email);
+      if (known) return fail(known.unsubscribed_at ? 'Cette personne s\'est désinscrite. Elle peut se réinscrire elle-même sur le site.' : 'Cette adresse est déjà dans la liste.');
+      try {
+        await save('subscribers', { email, name: String(f.get('name') || '').trim() || null, source: 'manuel' });
+        closeModal();
+        PC.toast('Abonné ajouté');
+        render();
+      } catch (e2) {
+        fail(/duplicate|unique/i.test(e2.message || '') ? 'Cette adresse est déjà dans la liste.' : e2.message || 'Ajout impossible.');
+      }
+    });
+  }
+
+  /* ---------- Notifications sur l'appareil (Web Push) ----------
+     Disponibles dans un navigateur récent ; sur iPhone, seulement depuis
+     l'application ajoutée à l'écran d'accueil (iOS 16.4 ou plus récent). */
+  const PUSH = { supported: 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window, reg: null, sub: null, ready: false };
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  const vapidKey = () => (window.PRESSO_CONFIG || {}).vapidPublicKey || '';
+  const pushAvailable = () => store.mode === 'supabase' && !!vapidKey();
+  const b64ToBytes = (v) => {
+    const t = String(v).replace(/-/g, '+').replace(/_/g, '/');
+    return Uint8Array.from(atob(t + '==='.slice((t.length + 3) % 4)), (ch) => ch.charCodeAt(0));
+  };
+  function deviceLabel() {
+    const ua = navigator.userAgent;
+    const os = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) || (isIOS && !/iPhone/.test(ua)) ? 'iPad' : /Android/.test(ua) ? 'Android' : /Mac/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : 'Appareil';
+    const br = /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : '';
+    return (os + (br ? ' · ' + br : '')).slice(0, 200);
+  }
+  function refreshPushUi() {
+    const card = $('#push-card');
+    if (card) card.outerHTML = pushCard();
+    // le rappel de l'accueil apparaît ou disparaît sans redessiner la page
+    const hint = $('#push-hint');
+    if (hint && !pushHintNeeded()) hint.remove();
+    else if (!hint && UI.view === 'accueil' && pushHintNeeded()) {
+      const head = $('.page-head');
+      if (head) head.insertAdjacentHTML('afterend', pushHint());
+    }
+  }
+  async function pushInit() {
+    if (PUSH.supported && pushAvailable()) {
+      try {
+        PUSH.reg = await navigator.serviceWorker.register('sw.js');
+        PUSH.sub = await PUSH.reg.pushManager.getSubscription();
+        // l'abonnement de l'appareil peut changer : on le réenregistre à chaque ouverture
+        if (PUSH.sub && Notification.permission === 'granted') await store.savePush(PUSH.sub.toJSON(), deviceLabel()).catch(() => {});
+        // une notification touchée ou reçue pendant que l'application est ouverte
+        navigator.serviceWorker.addEventListener('message', (e) => {
+          const m = e.data || {};
+          if (m.type !== 'presso-push') return;
+          const view = String(m.url || '').split('#')[1];
+          const dlg = $('#modal');
+          if (dlg && dlg.open) return;
+          load().then(() => (m.clicked && VIEWS[view] ? go(view) : render())).catch(() => {});
+        });
+      } catch (e) {
+        console.warn('Notifications indisponibles', e);
+      }
+    }
+    PUSH.ready = true;
+    refreshPushUi();
+  }
+  // Rappel sur l'accueil tant que les notifications ne sont pas activées sur cet appareil
+  function pushHintNeeded() {
+    if (!pushAvailable() || !PUSH.ready || PUSH.sub) return false;
+    try {
+      if (localStorage.getItem('presso.pushHint') === 'off') return false;
+    } catch (e) { /* stockage indisponible */ }
+    if (PUSH.supported) return Notification.permission === 'default';
+    return isIOS && !isStandalone();
+  }
+  function pushHint() {
+    if (!pushHintNeeded()) return '';
+    return '<div class="alert info" id="push-hint">' + I('bell') + '<span class="grow"><b>Notifications</b> : ' + (PUSH.supported ? 'sois prévenu des demandes et des messages sur cet appareil.' : 'ajoute l\'application à l\'écran d\'accueil pour être prévenu des demandes.') + '</span><button class="btn sm soft" data-nav="reglages">' + (PUSH.supported ? 'Activer' : 'Voir comment') + '</button><button class="btn sm ghost" data-act="push-hint-off">Plus tard</button></div>';
+  }
+  function pushCard() {
+    const head = '<div class="card" id="push-card" style="margin-bottom:16px"><div class="card-head"><h2>Notifications</h2>' + (PUSH.sub ? '<span class="badge good">Activées</span>' : '') + '</div><div class="stack">';
+    const what = '<p class="small muted">Une notification arrive sur cet appareil pour chaque nouvelle demande de réservation, demande de test pilote et message reçu sur ' + CONTACT_EMAIL + '.</p>';
+    let inner;
+    if (store.mode !== 'supabase') inner = '<p class="small muted">Mode démo : les notifications fonctionnent une fois la base branchée.</p>';
+    else if (!vapidKey()) inner = '<p class="small muted">Les notifications ne sont pas encore configurées sur ce site.</p>';
+    else if (!PUSH.supported) {
+      inner = isIOS && !isStandalone()
+        ? '<p>Sur iPhone et iPad, les notifications fonctionnent depuis l\'application installée :</p><ol class="steps-list"><li>Ouvre cette page dans Safari.</li><li>Touche le bouton Partager, puis « Sur l\'écran d\'accueil ».</li><li>Ouvre Presso Center depuis la nouvelle icône et connecte-toi.</li><li>Reviens dans Réglages et touche « Activer les notifications ».</li></ol><p class="small muted">Il faut iOS 16.4 ou plus récent. Si l\'application était déjà sur l\'écran d\'accueil avant cette mise à jour, supprime l\'icône et ajoute-la de nouveau.</p>'
+        : '<p class="small muted">Ce navigateur ne gère pas les notifications. Essaie avec Chrome, Edge, Firefox ou Safari à jour.</p>';
+    } else if (!PUSH.ready) inner = '<p class="small muted">Vérification…</p>';
+    else if (Notification.permission === 'denied') inner = '<div class="alert warn">' + I('alert') + '<span>Les notifications sont bloquées pour ce site sur cet appareil. Autorise-les dans les réglages du téléphone ou du navigateur (Notifications → Presso Center), puis reviens ici.</span></div>';
+    else if (PUSH.sub) inner = what + '<div class="row wrap"><button class="btn sm soft" data-act="push-test">' + I('bell') + 'Envoyer une notification de test</button><button class="btn sm ghost" data-act="push-disable">Désactiver sur cet appareil</button></div>';
+    else inner = what + '<div class="row wrap"><button class="btn" data-act="push-enable">' + I('bell') + 'Activer les notifications</button></div><p class="small muted">À faire une fois sur chaque appareil. Le téléphone demande ton autorisation.</p>';
+    return head + inner + '</div></div>';
+  }
+  async function pushEnable() {
+    // la demande d'autorisation doit partir directement du geste de l'utilisateur
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      PC.toast('Notifications refusées', 'bad');
+      return refreshPushUi();
+    }
+    try {
+      PUSH.reg = PUSH.reg || (await navigator.serviceWorker.register('sw.js'));
+      await navigator.serviceWorker.ready;
+      const opts = { userVisibleOnly: true, applicationServerKey: b64ToBytes(vapidKey()) };
+      try {
+        PUSH.sub = await PUSH.reg.pushManager.subscribe(opts);
+      } catch (e) {
+        // un ancien abonnement lié à une autre clé : on repart de zéro
+        const old = await PUSH.reg.pushManager.getSubscription();
+        if (!old) throw e;
+        await old.unsubscribe();
+        PUSH.sub = await PUSH.reg.pushManager.subscribe(opts);
+      }
+      await store.savePush(PUSH.sub.toJSON(), deviceLabel());
+      PC.toast('Notifications activées sur cet appareil');
+    } catch (e) {
+      console.error(e);
+      if (PUSH.sub) await PUSH.sub.unsubscribe().catch(() => {});
+      PUSH.sub = null;
+      PC.toast('Activation impossible : ' + (e.message || 'réessaie'), 'bad');
+    }
+    refreshPushUi();
+  }
+  async function pushDisable() {
+    if (!PUSH.sub) return;
+    try {
+      await store.removePush(PUSH.sub.endpoint);
+      await PUSH.sub.unsubscribe();
+      PUSH.sub = null;
+      PC.toast('Notifications désactivées sur cet appareil');
+    } catch (e) {
+      PC.toast(e.message || 'Erreur', 'bad');
+    }
+    refreshPushUi();
+  }
+  async function pushTest() {
+    if (!PUSH.sub) return;
+    try {
+      const out = await store.testPush(PUSH.sub.endpoint);
+      if (out.ok) PC.toast('Notification envoyée : elle arrive dans quelques secondes');
+      else PC.toast(out.total ? 'Envoi refusé par le service de notification' + (out.errors && out.errors[0] ? ' (' + out.errors[0] + ')' : '') : 'Cet appareil n\'est plus enregistré : désactive puis réactive les notifications', 'bad');
+    } catch (e) {
+      PC.toast(e.message || 'Erreur', 'bad');
+    }
   }
 
   async function sendMessage(p, form, errEl) {
@@ -1779,6 +2209,7 @@
       '<div><span class="label">Prévisionnel de chiffre d\'affaires (12 premiers mois)</span><div class="grid-3" style="grid-template-columns:repeat(4,minmax(0,1fr));gap:6px">' + (S.forecast || []).map((v, i) => '<label class="field"><span class="small muted" style="font-weight:500">' + esc(PC.fmtMonth(PC.addMonths(S.start_month, i), true)) + '</span><input type="number" step="25" min="0" name="fc_' + i + '" value="' + v + '" style="min-height:38px;padding:6px 8px"></label>').join('') + '</div></div>' +
       '</div></form>';
     // Données
+    h += pushCard();
     h += '<div class="card"><div class="card-head"><h2>Données et affichage</h2></div><div class="stack">' +
       '<div class="row wrap"><span class="label" style="margin:0">Thème</span><div class="seg" role="group">' + [['auto', 'Automatique'], ['light', 'Clair'], ['dark', 'Sombre']].map(([k, l]) => '<button data-act="theme" data-id="' + k + '" aria-pressed="' + ((document.documentElement.dataset.theme || 'auto') === k) + '">' + l + '</button>').join('') + '</div></div>' +
       '<p class="small muted">' + (store.mode === 'local' ? 'Mode démo : les données sont enregistrées dans ce navigateur uniquement. Branche la base Supabase (fichier assets/config.js) pour recevoir les réservations des clients.' : 'Données enregistrées dans la base Supabase de Presso Center.') + '</p>' +
@@ -1951,7 +2382,7 @@
         const wasRequest = b.status === 'demande';
         const mail = bookingMail(b, 'refuse');
         await setStatus(id, 'annulee', wasRequest ? 'Demande refusée' : 'Séance annulée');
-        if (wasRequest && mail.to) composeMessage(mail);
+        if (wasRequest && mail.to) composeMessage(mail, { booking: b });
         return undefined;
       }
       case 'absent-booking': return setStatus(id, 'absent', 'Marqué absent');
@@ -2009,14 +2440,39 @@
       case 'refresh-messages': return refreshMessages(true);
       case 'open-message': return openMessage(id);
       case 'new-message': return composeMessage();
-      case 'write-client': return composeMessage({ to: el.dataset.to || '' });
+      case 'write-client': return composeMessage({ to: el.dataset.to || '' }, { client: clientById(id) });
+      case 'reply-template': {
+        const m = (D.messages || []).find((x) => x.id === id);
+        if (!m) return undefined;
+        const em = String(m.from_email || '').toLowerCase();
+        return composeMessage(
+          { to: m.from_email || '', subject: /^re\s*:/i.test(m.subject || '') ? m.subject : 'Re: ' + (m.subject || ''), reply_to_id: m.id },
+          { client: (em && D.clients.find((c) => String(c.email || '').toLowerCase() === em)) || null, partner: (em && D.partners.find((x) => String(x.email || '').toLowerCase() === em)) || null }
+        );
+      }
+      case 'new-letter': return composeLetter();
+      case 'new-subscriber': return subscriberDialog();
+      case 'delete-subscriber': {
+        const sub = (D.subscribers || []).find((x) => x.id === id);
+        if (!sub || !window.confirm('Retirer ' + sub.email + ' de la liste ?')) return undefined;
+        return run(() => remove('subscribers', id), 'Abonné retiré');
+      }
+      case 'push-enable': return pushEnable();
+      case 'push-disable': return pushDisable();
+      case 'push-test': return pushTest();
+      case 'push-hint-off': {
+        try { localStorage.setItem('presso.pushHint', 'off'); } catch (e) { /* choix non mémorisé */ }
+        const hint = $('#push-hint');
+        if (hint) hint.remove();
+        return undefined;
+      }
       case 'email-booking': {
         const b = D.bookings.find((x) => x.id === id);
-        return b ? composeMessage(bookingMail(b, el.dataset.tpl)) : undefined;
+        return b ? composeMessage(bookingMail(b, el.dataset.tpl), { booking: b }) : undefined;
       }
       case 'email-partner': {
         const p = partnerById(id);
-        return p ? composeMessage(partnerMail(p)) : undefined;
+        return p ? composeMessage(partnerMail(p), { partner: p }) : undefined;
       }
       case 'delete-message': {
         if (!window.confirm('Supprimer ce message de la messagerie ?')) return;

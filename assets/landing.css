@@ -121,6 +121,19 @@ html { scroll-behavior: smooth; }
 .lp-contact .lp-cta { justify-content: center; }
 .lp-contact .mail { display: inline-block; margin-top: 26px; font-size: clamp(20px, 4.4vw, 28px); font-weight: 700; letter-spacing: -0.01em; color: var(--ink); text-decoration: none; border-bottom: 2px solid var(--gold); padding-bottom: 2px; }
 .lp-contact .mail:hover { color: var(--gold-ink); }
+.lp-letter { margin: 44px auto 0; padding: 24px 22px; max-width: 30rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); text-align: left; }
+.lp-letter h3 { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; }
+.lp-contact .lp-letter p { margin-top: 6px; font-size: 14.5px; line-height: 1.5; color: var(--ink-2); }
+.lp-letter-row { display: flex; gap: 8px; margin-top: 14px; }
+.lp-letter-row input { flex: 1 1 auto; min-width: 0; min-height: 46px; padding: 10px 14px; border: 1px solid var(--line-2, var(--line)); border-radius: 12px; background: var(--bg); color: var(--ink); font: inherit; font-size: 16px; }
+.lp-letter-row input:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+.lp-contact .lp-letter .lp-letter-msg { min-height: 0; margin-top: 10px; font-weight: 600; }
+.lp-contact .lp-letter .lp-letter-msg:empty { display: none; }
+.lp-letter-msg.good { color: var(--good); }
+.lp-letter-msg.bad { color: var(--bad); }
+.lp-contact .lp-letter .lp-letter-legal { font-size: 12.5px; color: var(--ink-3); }
+.lp-letter-legal a { color: inherit; }
+@media (max-width: 420px) { .lp-letter-row { flex-direction: column; } }
 
 .lp-foot { padding: 34px 20px 44px; border-top: 1px solid var(--line); font-size: 13px; color: var(--ink-3); }
 .lp-foot .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 14px 28px; align-items: center; }

@@ -156,7 +156,8 @@
     equipment: ['id', 'name', 'kind', 'model', 'serial', 'size', 'purchase_date', 'purchase_price', 'status', 'last_check', 'notes', 'created_at'],
     stock: ['id', 'name', 'unit', 'qty', 'min_qty', 'per_passage', 'unit_cost', 'notes', 'created_at'],
     checks: ['id', 'date', 'items', 'ok', 'notes', 'created_at'],
-    messages: ['id', 'direction', 'from_name', 'from_email', 'to_email', 'subject', 'body', 'attachments', 'reply_to_id', 'read', 'created_at']
+    messages: ['id', 'direction', 'from_name', 'from_email', 'to_email', 'subject', 'body', 'attachments', 'reply_to_id', 'read', 'created_at'],
+    subscribers: ['id', 'email', 'name', 'source', 'unsubscribed_at', 'created_at']
   };
   PC.TABLES = Object.keys(PC.SCHEMA);
 
@@ -268,6 +269,7 @@
     }
     return [a, z];
   };
+  PC.isEmail = (v) => /^[^\s@<>",;]+@[^\s@<>",;]+\.[^\s@<>",;]{2,}$/.test(String(v || '').trim()) && String(v).trim().length <= 160;
   PC.capacity = (equipment) => (equipment || []).filter((e) => (e.kind || 'botte') === 'botte' && e.status === 'ok').length;
 
   // busy : réservations actives {start_at, duration_min, kind, boots}
@@ -460,7 +462,8 @@
     send: '<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>',
     refresh: '<path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>',
     wave: '<path d="M2 8c2.5-3 5-3 7.5 0s5 3 7.5 0 3.5-2.2 5-2.2"/><path d="M2 16c2.5-3 5-3 7.5 0s5 3 7.5 0 3.5-2.2 5-2.2"/>',
-    star: '<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/>'
+    star: '<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/>',
+    bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>'
   };
   PC.icon = function (name, cls) {
     return '<svg class="ic' + (cls ? ' ' + cls : '') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[name] || '') + '</svg>';
@@ -636,7 +639,13 @@
       { id: PC.uid(), direction: 'in', from_name: 'Karim B.', from_email: 'karim.b@example.com', to_email: 'contact@pressocenter.fr', subject: 'Carte 10 séances', body: 'Bonjour, comment fait-on pour acheter une carte 10 séances ? Peut-on la partager à deux ?\n\nKarim', attachments: [], reply_to_id: null, read: true, created_at: ago(50) },
       { id: PC.uid(), direction: 'out', from_name: 'Presso Center', from_email: 'contact@pressocenter.fr', to_email: 'karim.b@example.com', subject: 'Re: Carte 10 séances', body: 'Bonjour Karim,\n\nLa carte s\'achète lors d\'une séance, au prix de 170 €. Elle est nominative.\n\nÀ bientôt,\nPresso Center', attachments: [], reply_to_id: null, read: true, created_at: ago(47) }
     ];
-    return { settings: s, clients, partners, bookings, transactions, equipment, stock, checks, messages };
+    const subscribers = [
+      { id: PC.uid(), email: 'camille.p@example.com', name: 'Camille', source: 'reservation', token: PC.uid(), unsubscribed_at: null, created_at: ago(20 * 24) },
+      { id: PC.uid(), email: 'thomas.coach@example.com', name: 'Thomas', source: 'manuel', token: PC.uid(), unsubscribed_at: null, created_at: ago(12 * 24) },
+      { id: PC.uid(), email: 'ines.run@example.com', name: '', source: 'site', token: PC.uid(), unsubscribed_at: null, created_at: ago(3 * 24) },
+      { id: PC.uid(), email: 'marc.d@example.com', name: 'Marc', source: 'site', token: PC.uid(), unsubscribed_at: ago(1 * 24), created_at: ago(30 * 24) }
+    ];
+    return { settings: s, clients, partners, bookings, transactions, equipment, stock, checks, messages, subscribers };
   };
 
   /* ------------------------------------------------------------------
@@ -744,6 +753,38 @@
         save();
         return JSON.parse(JSON.stringify(row));
       },
+      // Lettre d'information (démo : rien ne part réellement)
+      async subscribe(p) {
+        const d = load();
+        const email = String(p.email || '').trim().toLowerCase();
+        if (!PC.isEmail(email)) throw new Error('Adresse e-mail invalide.');
+        d.subscribers = d.subscribers || [];
+        const row = d.subscribers.find((x) => String(x.email).toLowerCase() === email);
+        if (row) {
+          row.unsubscribed_at = null;
+          if (p.name) row.name = String(p.name).trim();
+        } else d.subscribers.push({ id: PC.uid(), email, name: String(p.name || '').trim(), source: p.source === 'reservation' ? 'reservation' : 'site', token: PC.uid(), unsubscribed_at: null, created_at: new Date().toISOString() });
+        save();
+        return { ok: true };
+      },
+      async unsubscribe(token) {
+        const d = load();
+        const row = (d.subscribers || []).find((x) => x.token === token);
+        if (!row) return { ok: false };
+        row.unsubscribed_at = row.unsubscribed_at || new Date().toISOString();
+        save();
+        return { ok: true, email: String(row.email).replace(/^(.{1,2})[^@]*/, '$1***') };
+      },
+      async sendNewsletter(p) {
+        const d = load();
+        if (p.test) return { ok: true, sent: 1, failed: 0, total: 1, to: 'mode démo', message: null };
+        const n = (d.subscribers || []).filter((x) => !x.unsubscribed_at).length;
+        if (!n) throw new Error("Aucun abonné pour l'instant.");
+        const row = { id: p.id || PC.uid(), direction: 'out', from_name: 'Presso Center', from_email: 'contact@pressocenter.fr', to_email: 'Lettre · ' + n + ' abonné' + (n > 1 ? 's' : ''), subject: p.subject, body: p.body, attachments: [], reply_to_id: null, read: true, created_at: new Date().toISOString() };
+        (d.messages = d.messages || []).push(row);
+        save();
+        return { ok: true, sent: n, failed: 0, total: n, to: null, message: JSON.parse(JSON.stringify(row)) };
+      },
       async exportAll() {
         return JSON.parse(JSON.stringify(load()));
       },
@@ -778,6 +819,20 @@
         out.push(...data);
         if (data.length < 1000) break;
       }
+      return out;
+    };
+    // Appel d'une route de la fonction « mail » avec la session du gérant
+    const callFn = async (route, body) => {
+      const { data } = await sb.auth.getSession();
+      const token = data.session && data.session.access_token;
+      if (!token) throw new Error('Session expirée, reconnecte-toi.');
+      const res = await fetch(cfg.supabaseUrl + '/functions/v1/mail/' + route, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify(body || {})
+      });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(out.error || 'Envoi impossible (' + res.status + ').');
       return out;
     };
     return {
@@ -868,17 +923,33 @@
       },
       // Envoi au nom de contact@ : passe par la fonction « mail », qui vérifie le compte gérant
       async sendMail(p) {
-        const { data } = await sb.auth.getSession();
-        const token = data.session && data.session.access_token;
-        if (!token) throw new Error('Session expirée, reconnecte-toi.');
-        const res = await fetch(cfg.supabaseUrl + '/functions/v1/mail/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-          body: JSON.stringify(Object.assign({ id: PC.uid() }, p))
-        });
-        const out = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(out.error || 'Envoi impossible (' + res.status + ').');
-        return out.message;
+        return (await callFn('send', Object.assign({ id: PC.uid() }, p))).message;
+      },
+      // Lettre d'information
+      async subscribe(p) {
+        const { data, error } = await sb.rpc('newsletter_subscribe', { p });
+        fail(error);
+        return data;
+      },
+      async unsubscribe(token) {
+        const { data, error } = await sb.rpc('newsletter_unsubscribe', { p_token: token });
+        fail(error);
+        return data || { ok: false };
+      },
+      async sendNewsletter(p) {
+        return callFn('newsletter', p);
+      },
+      // Notifications : abonnement de cet appareil
+      async savePush(sub, device) {
+        const { error } = await sb.from('push_subscriptions').upsert({ endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth, device: device || null }, { onConflict: 'endpoint' });
+        fail(error);
+      },
+      async removePush(endpoint) {
+        const { error } = await sb.from('push_subscriptions').delete().eq('endpoint', endpoint);
+        fail(error);
+      },
+      async testPush(endpoint) {
+        return callFn('push-test', { endpoint });
       },
       async exportAll() {
         const all = await this.loadAll();
