@@ -98,6 +98,7 @@
     if (st.svc && st.svc.kind === 'domicile') {
       html += '<div class="alert info" style="margin-top:12px">' + PC.icon('pin') + '<span>On vient chez toi avec le matériel, dans Tours Métropole. Prévois un canapé ou un lit pour t\'allonger.</span></div>';
     }
+    if (info.base_location) html += '<p class="small muted" style="margin-top:12px">Lieu des séances : ' + esc(info.base_location) + (svcList().some((x) => x.kind === 'domicile') ? ' Avec la formule « À domicile », on se déplace chez toi.' : '') + '</p>';
     if ((info.packs || []).length) {
       html += '<div class="packs">' + info.packs.map((p) => '<span><b>' + esc(p.name) + ' : ' + PC.eur(p.price) + '</b> · ' + esc(p.desc) + '</span>').join('') + '<span>Disponibles sur demande lors d\'une séance.</span></div>';
     }

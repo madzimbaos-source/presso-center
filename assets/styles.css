@@ -373,6 +373,8 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .cal-col { position: relative; border-left: 1px solid var(--line); cursor: copy; }
 .cal-col .hl { position: absolute; left: 0; right: 0; border-top: 1px solid var(--line); pointer-events: none; }
 .cal-col .win { position: absolute; left: 0; right: 0; background: var(--gold-soft); opacity: 0.55; pointer-events: none; }
+.win-chip { position: absolute; right: 2px; max-width: calc(100% - 4px); overflow: hidden; text-overflow: ellipsis; z-index: 2; padding: 1px 6px; border-radius: 7px; border: 1px solid var(--gold); background: var(--surface); color: var(--gold-ink); font: 600 10px/1.5 var(--font); font-variant-numeric: tabular-nums; cursor: pointer; white-space: nowrap; }
+.win-chip:hover { background: var(--gold-soft); }
 .cal-col.today { background: color-mix(in srgb, var(--gold-soft) 25%, transparent); }
 .cal-now { position: absolute; left: 0; right: 0; height: 2px; background: var(--bad); z-index: 2; pointer-events: none; }
 .ev {

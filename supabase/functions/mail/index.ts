@@ -141,7 +141,7 @@ type Row = Record<string, any>;
 
 function bookingRows(b: Row, forOwner: boolean): [string, string][] {
   const formule = `${esc(b.service_name || b.service || 'Séance')}${Number(b.people) > 1 ? ' × ' + esc(b.people) : ''}`;
-  const where = b.kind === 'domicile' ? esc(b.address || 'À domicile') : esc(b.location || b.base_location || '');
+  const where = b.kind === 'domicile' ? esc(b.address || 'À domicile') : esc(b.reception_address || b.location || b.base_location || '');
   const rows: [string, string][] = [
     ['Formule', formule],
     ['Date', `${esc(dateFr(b.start_at))} à ${esc(timeFr(b.start_at))}`],

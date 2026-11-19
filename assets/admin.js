@@ -382,6 +382,9 @@
     const mk = PC.monthKey(now);
     const dem = D.bookings.filter((b) => b.status === 'demande');
     if (dem.length) out.push({ cls: 'warn', icon: 'clock', html: '<b>' + dem.length + ' demande' + (dem.length > 1 ? 's' : '') + ' à confirmer</b> sur l\'agenda', act: 'nav', arg: 'agenda', btn: 'Voir' });
+    const horizon = Number(S.max_days_ahead) || 28;
+    const anyOpen = Array.from({ length: horizon + 1 }, (_, i) => PC.addDays(PC.startOfDay(now), i)).some((d) => PC.availability(d, S).length);
+    if (!anyOpen) out.push({ cls: 'bad', icon: 'calendar', html: '<b>Aucune disponibilité ouverte</b> : les clients ne peuvent pas réserver en ligne', act: 'new-avail', btn: 'Ajouter' });
     const unread = unreadCount();
     if (unread) out.push({ cls: 'info', icon: 'mail', html: '<b>' + unread + ' message' + (unread > 1 ? 's' : '') + ' non lu' + (unread > 1 ? 's' : '') + '</b> dans la messagerie', act: 'nav', arg: 'messages', btn: 'Lire' });
     const toClose = D.bookings.filter((b) => b.status === 'confirmee' && b.kind !== 'indispo' && bEnd(b) < now);
@@ -513,7 +516,9 @@
     const weekB = D.bookings.filter((b) => bStart(b) >= ws && bStart(b) < PC.addDays(ws, 7) && b.status !== 'annulee' && b.kind !== 'indispo');
     const pending = D.bookings.filter((b) => b.status === 'demande').sort((a, b) => bStart(a) - bStart(b));
 
-    let h = '<div class="page-head"><div><h1>Agenda</h1><p>' + esc(label) + '</p></div><button class="btn" data-act="new-booking">' + I('plus') + 'Nouveau</button></div>';
+    let h = '<div class="page-head"><div><h1>Agenda</h1><p>' + esc(label) + '</p></div><div class="row wrap"><button class="btn gold" data-act="new-avail">' + I('plus') + 'Disponibilité</button><button class="btn" data-act="new-booking">' + I('plus') + 'Séance</button></div></div>';
+    const weekOpen = Array.from({ length: 7 }, (_, i) => PC.addDays(ws, i)).some((d) => PC.ymd(d) >= PC.ymd(new Date()) && PC.availability(d, S).length);
+    if (!weekOpen && PC.ymd(we) >= PC.ymd(new Date())) h += '<div class="alert warn">' + I('calendar') + '<span class="grow"><b>Aucune disponibilité cette semaine</b> : les clients ne peuvent pas réserver sur ces jours.</span><button class="btn sm soft" data-act="new-avail">Ajouter</button></div>';
     if (pending.length) {
       h += '<div class="card" style="margin-bottom:16px;border-color:var(--gold)"><div class="card-head"><h2>Demandes à confirmer</h2><span class="badge warn">' + pending.length + '</span></div><div class="list">' +
         pending.map((b) => {
@@ -532,7 +537,7 @@
       }).join('') + '</div>';
     }
     h += calendar(days, mobile);
-    h += '<div class="legend" style="margin-top:12px"><span><i class="dot" style="background:var(--c-seance)"></i>Séance</span><span><i class="dot" style="background:var(--c-domicile)"></i>À domicile</span><span><i class="dot" style="background:var(--c-club)"></i>Créneau club</span><span><i class="dot" style="background:var(--c-event)"></i>Événement</span><span><i class="dot" style="background:var(--c-indispo)"></i>Indisponible</span><span><i class="dot" style="background:var(--gold-soft);border:1px solid var(--gold)"></i>Ouvert à la réservation en ligne</span><span>Bordure en pointillés : à confirmer</span></div>';
+    h += '<div class="legend" style="margin-top:12px"><span><i class="dot" style="background:var(--c-seance)"></i>Séance</span><span><i class="dot" style="background:var(--c-domicile)"></i>À domicile</span><span><i class="dot" style="background:var(--c-club)"></i>Créneau club</span><span><i class="dot" style="background:var(--c-event)"></i>Événement</span><span><i class="dot" style="background:var(--c-indispo)"></i>Indisponible</span><span><i class="dot" style="background:var(--gold-soft);border:1px solid var(--gold)"></i>Disponible à la réservation (↻ = chaque semaine)</span><span>Bordure en pointillés : à confirmer</span></div>';
     return h;
   }
 
@@ -564,9 +569,11 @@
       const key = PC.ymd(d);
       h += '<div class="cal-col' + (key === todayKey ? ' today' : '') + '" data-day="' + key + '" style="height:' + height + 'px">';
       for (let hh = minH + 1; hh < maxH; hh++) h += '<div class="hl" style="top:' + (hh * 60 - startMin) * PX + 'px"></div>';
-      PC.windowsFor(d, S).forEach(([a, b]) => {
+      PC.availability(d, S).forEach((w) => {
+        const a = PC.atTime(d, w.from), b = PC.atTime(d, w.to);
         const t = (a.getHours() * 60 + a.getMinutes() - startMin) * PX;
-        h += '<div class="win" style="top:' + t + 'px;height:' + ((b - a) / 60000) * PX + 'px"></div>';
+        h += '<div class="win" style="top:' + t + 'px;height:' + ((b - a) / 60000) * PX + 'px"></div>' +
+          '<button class="win-chip" data-act="edit-avail" data-type="' + w.type + '" data-i="' + w.index + '" data-day="' + key + '" style="top:' + (t + 2) + 'px" title="Modifier cette disponibilité' + (w.type === 'weekly' ? ' (chaque semaine)' : '') + '">' + (w.type === 'weekly' ? '↻ ' : '') + w.from.replace(':', 'h') + '–' + w.to.replace(':', 'h') + '</button>';
       });
       const items = D.bookings
         .filter((b) => PC.ymd(bStart(b)) === key && b.status !== 'annulee')
@@ -591,6 +598,87 @@
     });
     h += '</div></div>';
     return h;
+  }
+
+  /* ---------- Disponibilités : plages de chaque semaine ou d'une date précise ---------- */
+  function availDialog(opts) {
+    opts = opts || {};
+    const editing = !!opts.type;
+    const day = opts.day ? PC.parseYmd(opts.day) : (mq.matches ? UI.day : (PC.ymd(UI.week) <= PC.ymd(new Date()) && PC.ymd(new Date()) <= PC.ymd(PC.addDays(UI.week, 6)) ? PC.startOfDay(new Date()) : UI.week));
+    let cur = null;
+    if (opts.type === 'weekly') {
+      const w = ((S.hours || {})[String(day.getDay())] || [])[opts.index];
+      cur = w ? { from: w[0], to: w[1] } : null;
+    } else if (opts.type === 'date') cur = (S.open_slots || [])[opts.index] || null;
+    const v = { date: PC.ymd(day), from: cur ? cur.from : '18:00', to: cur ? cur.to : '21:00', repeat: opts.type || 'date' };
+    const dayName = (d) => PC.parseYmd(d).toLocaleDateString('fr-FR', { weekday: 'long' });
+    const body = '<form id="av-form" class="stack">' +
+      '<label class="field"><span>Jour</span><input type="date" name="date" value="' + v.date + '" required></label>' +
+      '<div class="grid-2"><label class="field"><span>De</span><input type="time" name="from" step="900" value="' + v.from + '" required></label><label class="field"><span>À</span><input type="time" name="to" step="900" value="' + v.to + '" required></label></div>' +
+      '<fieldset style="border:0;padding:0;margin:0" class="stack"><legend class="label">Répétition</legend>' +
+      '<label class="check"><input type="radio" name="repeat" value="date"' + (v.repeat === 'date' ? ' checked' : '') + '><span>Ce jour seulement</span></label>' +
+      '<label class="check"><input type="radio" name="repeat" value="weekly"' + (v.repeat === 'weekly' ? ' checked' : '') + '><span>Chaque <span id="av-day">' + esc(dayName(v.date)) + '</span></span></label></fieldset>' +
+      '<p class="small muted">Les clients peuvent réserver sur cette plage. Les créneaux déjà pris, les clubs et les événements en sont retirés automatiquement.</p>' +
+      '<p class="form-error hide" id="av-error" role="alert"></p></form>';
+    const foot = (editing ? '<button class="btn danger" type="button" data-av="delete">Supprimer</button>' : '') +
+      (opts.type === 'weekly' ? '<button class="btn ghost" type="button" data-av="close-day">Fermer ce jour seulement</button>' : '') +
+      '<button class="btn ghost" data-close>Annuler</button><button class="btn" type="submit" form="av-form">Enregistrer</button>';
+    modal({ title: editing ? 'Modifier la disponibilité' : 'Nouvelle disponibilité', body, foot });
+    const form = $('#av-form');
+    form.elements.date.addEventListener('change', () => { if (form.elements.date.value) $('#av-day').textContent = dayName(form.elements.date.value); });
+
+    const draft = () => {
+      const next = JSON.parse(JSON.stringify(S));
+      next.hours = next.hours || {};
+      next.open_slots = Array.isArray(next.open_slots) ? next.open_slots : [];
+      if (opts.type === 'weekly') {
+        const k = String(day.getDay());
+        (next.hours[k] || []).splice(opts.index, 1);
+        if (!(next.hours[k] || []).length) delete next.hours[k];
+      } else if (opts.type === 'date') next.open_slots.splice(opts.index, 1);
+      return next;
+    };
+    const commit = (next, msg, date) => run(async () => {
+      const limit = PC.ymd(PC.addDays(new Date(), -1));
+      next.open_slots = next.open_slots.filter((x) => x && x.date >= limit).sort((a, b) => (a.date + a.from).localeCompare(b.date + b.from));
+      await saveSettings(next);
+      if (date) {
+        UI.week = PC.startOfWeek(PC.parseYmd(date));
+        UI.day = PC.parseYmd(date);
+      }
+      closeModal();
+    }, msg);
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const f = new FormData(form);
+      const date = String(f.get('date')), from = String(f.get('from')), to = String(f.get('to'));
+      const err = $('#av-error');
+      if (!date || !from || !to || from >= to) {
+        err.textContent = "L'heure de fin doit être après l'heure de début.";
+        err.classList.remove('hide');
+        return;
+      }
+      const next = draft();
+      if (f.get('repeat') === 'weekly') {
+        const k = String(PC.parseYmd(date).getDay());
+        (next.hours[k] = next.hours[k] || []).push([from, to]);
+        next.hours[k].sort((a, b) => a[0].localeCompare(b[0]));
+      } else next.open_slots.push({ date, from, to });
+      commit(next, editing ? 'Disponibilité modifiée' : 'Disponibilité ajoutée', date);
+    });
+    $$('[data-av]', $('#modal')).forEach((btn) => btn.addEventListener('click', () => {
+      if (btn.dataset.av === 'delete') {
+        if (opts.type === 'weekly' && !window.confirm('Retirer cette disponibilité de tous les ' + dayName(v.date) + 's ?')) return;
+        return commit(draft(), 'Disponibilité retirée');
+      }
+      // plage hebdomadaire fermée pour cette seule date
+      return run(async () => {
+        const start = PC.atTime(day, v.from);
+        await save('bookings', { kind: 'indispo', title: 'Fermé ce jour', start_at: start.toISOString(), duration_min: Math.round((PC.atTime(day, v.to) - start) / 60000), boots: 0, people: 0, status: 'confirmee', price: 0, ref: PC.makeRef(), source: 'manuel' });
+        closeModal();
+      }, 'Plage fermée pour le ' + PC.fmtDay(day, { day: 'numeric', month: 'long' }));
+    }));
   }
 
   function layoutLanes(items) {
@@ -620,7 +708,7 @@
     const first = String(b.client_name || '').split(' ')[0];
     const sv = PC.service(S, b.service);
     const what = sv ? sv.name : 'séance';
-    const where = b.kind === 'domicile' ? 'chez toi (' + (b.address || '') + ')' : (b.location || S.base_location);
+    const where = b.kind === 'domicile' ? 'chez toi (' + (b.address || '') + ')' : (S.reception_address || b.location || S.base_location);
     const when = PC.fmtDayLong(s) + ' à ' + PC.fmtTime(s);
     if (type === 'confirm') return 'Bonjour ' + first + ', ici Presso Center. Ta séance ' + what + ' du ' + when + ' est confirmée. Lieu : ' + where + '. À bientôt !';
     if (type === 'refuse') return 'Bonjour ' + first + ', ici Presso Center. Malheureusement, le créneau du ' + when + ' n\'est plus disponible. Tu peux en choisir un autre ici : ' + bookingUrl();
@@ -1629,9 +1717,10 @@
     h += '<form class="card" id="set-contact" style="margin-bottom:16px"><div class="card-head"><h2>Coordonnées</h2><button class="btn sm">Enregistrer</button></div><div class="stack">' +
       '<div class="grid-2"><label class="field"><span>Nom de l\'activité</span><input name="business_name" value="' + esc(S.business_name) + '"></label><label class="field"><span>Prénom (accueil de l\'espace de gestion)</span><input name="owner_name" value="' + esc(S.owner_name) + '"></label></div>' +
       '<div class="grid-2"><label class="field"><span>Téléphone WhatsApp</span><input name="phone" type="tel" value="' + esc(S.phone) + '"><small>Affiché aux clients pour te prévenir.</small></label><label class="field"><span>E-mail</span><input name="email" type="email" value="' + esc(S.email) + '"></label></div>' +
-      '<label class="field"><span>Lieu des séances individuelles</span><input name="base_location" value="' + esc(S.base_location) + '"></label></div></form>';
+      '<label class="field"><span>Lieu affiché sur le site</span><input name="base_location" value="' + esc(S.base_location) + '"><small>Pour les séances où le client vient sur place. Reste vague : ville ou quartier.</small></label>' +
+      '<label class="field"><span>Adresse d\'accueil des séances (privée)</span><input name="reception_address" value="' + esc(S.reception_address || '') + '" placeholder="Numéro, rue, commune, étage ou code d\'accès"><small>Jamais affichée sur le site. Envoyée au client dans l\'e-mail et le message de confirmation.</small></label></div></form>';
     // Horaires
-    h += '<form class="card" id="set-hours" style="margin-bottom:16px"><div class="card-head"><h2>Réservation en ligne</h2><button class="btn sm">Enregistrer</button></div><p class="small muted" style="margin-bottom:8px">Plages où les clients peuvent réserver seuls. Les créneaux clubs, événements et indisponibilités de l\'agenda sont retirés automatiquement.</p>';
+    h += '<form class="card" id="set-hours" style="margin-bottom:16px"><div class="card-head"><h2>Disponibilités de chaque semaine</h2><button class="btn sm">Enregistrer</button></div><p class="small muted" style="margin-bottom:8px">Plages répétées toutes les semaines. Pour ouvrir une date précise, utilise le bouton « Disponibilité » de l\'agenda. Les créneaux déjà pris, les clubs et les événements sont retirés automatiquement.</p>';
     DAYS.forEach(([k, label]) => {
       const wins = (S.hours[k] || []);
       h += '<div class="hours-row"><b>' + label + '</b><div data-day="' + k + '">' + wins.map((w, i) => winRow(k, i, w)).join('') + '<button type="button" class="btn sm ghost" data-act="add-window" data-id="' + k + '">' + I('plus') + 'Plage</button></div></div>';
@@ -1684,7 +1773,7 @@
         run(() => saveSettings(next), 'Réglages enregistrés');
       });
     };
-    on('set-contact', (fd, n) => ['business_name', 'owner_name', 'phone', 'email', 'base_location'].forEach((k) => (n[k] = String(fd.get(k) || '').trim())));
+    on('set-contact', (fd, n) => ['business_name', 'owner_name', 'phone', 'email', 'base_location', 'reception_address'].forEach((k) => (n[k] = String(fd.get(k) || '').trim())));
     on('set-hours', (fd, n, f) => {
       const hours = {};
       $$('[data-day]', f).forEach((el) => {
@@ -1797,6 +1886,8 @@
     const id = el.dataset.id;
     switch (act) {
       case 'nav': return go(id);
+      case 'new-avail': return availDialog();
+      case 'edit-avail': return availDialog({ type: el.dataset.type, index: Number(el.dataset.i), day: el.dataset.day });
       case 'new-booking': return editBooking(null);
       case 'new-booking-for': {
         const c = clientById(id);

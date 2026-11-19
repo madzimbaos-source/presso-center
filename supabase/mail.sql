@@ -71,7 +71,9 @@ begin
                          from jsonb_array_elements(coalesce(s -> 'services', '[]'::jsonb)) as x
                         where x ->> 'code' = new.service
                         limit 1),
-      'base_location', s ->> 'base_location'
+      'base_location', s ->> 'base_location',
+      -- adresse exacte : seulement une fois la séance confirmée
+      'reception_address', case when v_kind = 'booking_confirmed' then nullif(s ->> 'reception_address', '') end
     )
   );
   return new;

@@ -6,6 +6,7 @@ Application web de Presso Center, l'activité de récupération sportive mobile 
 - **`https://pressocenter.fr/reserver.html`** : page où les clients réservent. Formules et tarifs, créneaux libres selon les bottes disponibles, questionnaire de santé, autorisation parentale, ajout à l'agenda, message WhatsApp à Presso Center. Les clubs y demandent aussi un test pilote. Un lien `reserver.html?formule=plus` présélectionne une formule.
 - **`https://pressocenter.fr/gestion.html`** : espace de gestion, réservé au gérant.
   - **Accueil** : chiffre d'affaires comparé au prévisionnel, heures de la semaine sur le plafond de 16 h, liste « À faire » (demandes, séances à clôturer, paiements, stock, contrôle du matériel, mensualité Adie, seuil de TVA).
+  - **Disponibilités** : bouton « Disponibilité » de l'agenda pour ouvrir une plage, un jour précis ou chaque semaine. Les clients ne réservent que sur ces plages.
   - **Agenda** : semaine sur ordinateur, jour par jour sur téléphone ; séances, domicile, créneaux clubs, événements, indisponibilités ; confirmation et rappel par WhatsApp ; clôture d'une séance (passages, paiement, carte 10 séances).
   - **Clients** : fiches des sportifs (crédits, historique, santé) et suivi des clubs et partenaires, de la demande au contrat. Facturation du forfait mensuel et bilan de fréquentation imprimable pour le renouvellement.
   - **Messages** : les e-mails reçus sur `contact@pressocenter.fr`, avec réponse et nouveau message envoyés au nom de cette adresse.
@@ -14,6 +15,10 @@ Application web de Presso Center, l'activité de récupération sportive mobile 
   - **Réglages** : coordonnées, plages ouvertes à la réservation, tarifs, paramètres financiers, QR code pour les flyers, sauvegarde.
 
 Le site est statique (HTML, CSS, JavaScript), sans étape de compilation. GitHub Pages le sert tel quel depuis la branche `main`, sur le domaine déclaré dans le fichier `CNAME`.
+
+## Lieu des séances
+
+Les formules individuelles ont lieu sur place, chez Presso Center. Le site n'affiche qu'un lieu vague (`base_location`). L'adresse exacte (`reception_address`, réglage privé) n'est jamais exposée publiquement : elle est envoyée au client dans l'e-mail et le message de confirmation. La formule « À domicile » reste un déplacement chez le client.
 
 ## Deux modes
 

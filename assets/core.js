@@ -13,7 +13,10 @@
     phone: '',
     email: '',
     city: 'Tours',
-    base_location: 'Lieu précisé à la confirmation (Tours Métropole)',
+    // Lieu affiché sur le site pour les séances sur place
+    base_location: 'Chez Presso Center, à Tours. Adresse envoyée à la confirmation.',
+    // Adresse d'accueil exacte : privée, envoyée au client à la confirmation seulement
+    reception_address: '',
     // Créneaux ouverts à la réservation en ligne (0 = dimanche … 6 = samedi).
     // Semaine type du plan : lundi soir et dimanche pour les séances individuelles,
     // mercredi, vendredi et samedi réservés aux clubs, coachs et événements.
@@ -21,6 +24,8 @@
       '1': [['18:00', '21:30']],
       '0': [['14:00', '19:00']]
     },
+    // Disponibilités ponctuelles, en plus des plages de chaque semaine : { date, from, to }
+    open_slots: [],
     slot_step: 15,
     rotation_min: 5,
     travel_min: 30,
@@ -278,9 +283,21 @@
     return { ok: true, free: capacity - used - (req.kind === 'seance' ? need : 0) };
   };
 
+  // Disponibilités d'un jour : plages de chaque semaine + plages ajoutées pour cette date.
+  // Une séance doit tenir en entier dans une plage (même règle que la fonction SQL book).
+  PC.availability = function (day, s) {
+    const out = [];
+    ((s.hours || {})[String(day.getDay())] || []).forEach((x, i) => {
+      if (x && x[0] && x[1] && x[0] < x[1]) out.push({ type: 'weekly', index: i, from: x[0], to: x[1] });
+    });
+    const key = PC.ymd(day);
+    (s.open_slots || []).forEach((x, i) => {
+      if (x && x.date === key && x.from && x.to && x.from < x.to) out.push({ type: 'date', index: i, from: x.from, to: x.to });
+    });
+    return out.sort((a, b) => a.from.localeCompare(b.from));
+  };
   PC.windowsFor = function (day, s) {
-    const w = (s.hours || {})[String(day.getDay())] || [];
-    return w.filter((x) => x && x[0] && x[1]).map(([a, b]) => [PC.atTime(day, a), PC.atTime(day, b)]);
+    return PC.availability(day, s).map((w) => [PC.atTime(day, w.from), PC.atTime(day, w.to)]);
   };
 
   PC.reqFromService = function (svc, people) {
@@ -300,9 +317,11 @@
     const r = PC.reqFromService(svc, people);
     const step = Math.max(5, Number(s.slot_step) || 15) * 60000;
     const minStart = (now || new Date()).getTime() + (Number(s.min_notice_hours) || 0) * 3600000;
+    const seen = new Set();
     for (const [ws, we] of PC.windowsFor(day, s)) {
       for (let t = ws.getTime(); t + r.duration_min * 60000 <= we.getTime(); t += step) {
-        if (t < minStart) continue;
+        if (t < minStart || seen.has(t)) continue;
+        seen.add(t);
         const res = PC.checkSlot({ start_at: new Date(t).toISOString(), duration_min: r.duration_min, kind: r.kind, boots: r.boots }, busy, s, capacity);
         if (res.ok) out.push({ start: new Date(t), free: res.free });
       }
@@ -361,7 +380,7 @@
   };
 
   PC.publicSubset = function (s, capacity) {
-    const keys = ['business_name', 'phone', 'email', 'city', 'base_location', 'hours', 'slot_step', 'rotation_min', 'travel_min', 'min_notice_hours', 'max_days_ahead', 'services', 'packs', 'club_plans', 'club_options', 'season_discount'];
+    const keys = ['business_name', 'phone', 'email', 'city', 'base_location', 'hours', 'open_slots', 'slot_step', 'rotation_min', 'travel_min', 'min_notice_hours', 'max_days_ahead', 'services', 'packs', 'club_plans', 'club_options', 'season_discount'];
     const o = {};
     keys.forEach((k) => (o[k] = s[k]));
     o.capacity = capacity;

@@ -222,7 +222,7 @@ set search_path = ''
 as $$
   select coalesce(
       (select jsonb_object_agg(k, s.data -> k)
-         from unnest(array['business_name', 'phone', 'email', 'city', 'base_location', 'hours',
+         from unnest(array['business_name', 'phone', 'email', 'city', 'base_location', 'hours', 'open_slots',
                            'slot_step', 'rotation_min', 'travel_min', 'min_notice_hours', 'max_days_ahead',
                            'services', 'packs', 'club_plans', 'club_options', 'season_discount']) as k
         where s.data ? k),
@@ -350,8 +350,13 @@ begin
   -- dans une plage ouverte à la réservation (heure de Paris)
   v_local := v_start at time zone v_tz;
   v_end_local := v_local + make_interval(mins => v_dur);
+  -- plages de chaque semaine, plus les disponibilités ajoutées pour cette date
   for w in
     select value from jsonb_array_elements(coalesce(s -> 'hours' -> (extract(dow from v_local)::int)::text, '[]'::jsonb))
+    union all
+    select jsonb_build_array(x ->> 'from', x ->> 'to')
+      from jsonb_array_elements(coalesce(s -> 'open_slots', '[]'::jsonb)) as x
+     where x ->> 'date' = to_char(v_local, 'YYYY-MM-DD')
   loop
     if v_end_local::date = v_local::date
        and v_local::time >= (w ->> 0)::time
