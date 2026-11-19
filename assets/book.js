@@ -29,8 +29,16 @@
       }
       st.info = await store.publicInfo();
       await refreshBusy();
+      const want = new URLSearchParams(location.search).get('formule');
+      const pre = want && svcList().find((x) => x.code === want);
+      if (pre) {
+        st.svc = pre;
+        if (pre.per_person) st.people = Math.max(pre.min_people || 2, Math.min(st.people, pre.max_people || 5));
+      }
       render();
       renderClubs();
+      if (pre && $('#step-when')) $('#step-when').scrollIntoView({ block: 'start' });
+      else if (location.hash === '#clubs') clubsRoot.scrollIntoView({ block: 'start' });
     } catch (e) {
       console.error(e);
       root.innerHTML = '<section class="card"><h2 style="font-size:18px">Réservation momentanément indisponible</h2><p class="muted" style="margin-top:8px">' + esc(e.message) + '</p></section>';

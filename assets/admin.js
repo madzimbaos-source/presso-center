@@ -164,14 +164,14 @@
     const nav = (k, v) => '<button class="nav-btn" data-nav="' + k + '">' + I(v.icon) + '<span>' + v.label + '</span><span class="count hide" data-count="' + k + '"></span></button>';
     const tab = (k) => '<button data-nav="' + k + '">' + I(VIEWS[k].icon) + '<span>' + VIEWS[k].label + '</span><span class="count hide" data-count="' + k + '"></span></button>';
     const banner = store.mode === 'local'
-      ? '<div class="demo-banner">Mode démo : données fictives, enregistrées dans ce navigateur uniquement. <button data-act="reset-demo">Réinitialiser</button><a href="./" style="color:inherit">Page client</a></div>'
+      ? '<div class="demo-banner">Mode démo : données fictives, enregistrées dans ce navigateur uniquement. <button data-act="reset-demo">Réinitialiser</button><a href="reserver.html" style="color:inherit">Page client</a></div>'
       : '';
     document.body.innerHTML = banner +
       '<div class="app"><aside class="side"><a class="brand" href="#accueil">Presso Center</a>' +
       Object.keys(VIEWS).map((k) => nav(k, VIEWS[k])).join('') +
-      '<div class="spacer"></div><a class="nav-btn" href="./" target="_blank" rel="noopener">' + I('external') + '<span>Page de réservation</span></a>' +
+      '<div class="spacer"></div><a class="nav-btn" href="reserver.html" target="_blank" rel="noopener">' + I('external') + '<span>Page de réservation</span></a>' +
       (store.mode === 'supabase' ? '<button class="nav-btn" data-act="logout">' + I('logout') + '<span>Se déconnecter</span></button><div class="who">' + esc(UI.user ? UI.user.email : '') + '</div>' : '') +
-      '</aside><div class="content"><header class="topbar"><span class="brand" style="padding:0">Presso Center</span><span class="row"><a class="btn icon" href="./" target="_blank" rel="noopener" aria-label="Page de réservation">' + I('external') + '</a><button class="btn icon" data-nav="reglages" aria-label="Réglages">' + I('sliders') + '</button></span></header>' +
+      '</aside><div class="content"><header class="topbar"><span class="brand" style="padding:0">Presso Center</span><span class="row"><a class="btn icon" href="reserver.html" target="_blank" rel="noopener" aria-label="Page de réservation">' + I('external') + '</a><button class="btn icon" data-nav="reglages" aria-label="Réglages">' + I('sliders') + '</button></span></header>' +
       '<main class="main" id="view"></main></div>' +
       '<nav class="tabbar" aria-label="Navigation">' + ['accueil', 'agenda', 'clients', 'finances', 'materiel'].map(tab).join('') + '</nav></div>' +
       '<dialog class="modal" id="modal"></dialog>';
@@ -366,7 +366,7 @@
     return { check: c, days: Math.floor((PC.startOfDay(new Date()) - PC.parseYmd(c.date)) / 86400000) };
   }
   function bookingUrl() {
-    return new URL('./', location.href).href;
+    return new URL('reserver.html', location.href).href;
   }
   const fmtH = (h) => {
     const hh = Math.floor(h + 1e-9), mm = Math.round((h - hh) * 60);

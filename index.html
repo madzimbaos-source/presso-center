@@ -3,53 +3,169 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Presso Center · Réserver une séance</title>
-<meta name="description" content="Pressothérapie pour sportifs à Tours : séances au club, chez ton coach ou à domicile, dès 20 €. Réserve ton créneau en ligne.">
+<title>Presso Center · Récupération sportive mobile à Tours</title>
+<meta name="description" content="Pressothérapie pour sportifs à Tours : on vient au club, chez ton coach ou à domicile avec les bottes de récupération. Séances dès 20 €, réservation en ligne.">
 <meta name="theme-color" content="#0f1623">
 <link rel="canonical" href="https://pressocenter.fr/">
 <meta property="og:type" content="website">
+<meta property="og:locale" content="fr_FR">
+<meta property="og:site_name" content="Presso Center">
 <meta property="og:url" content="https://pressocenter.fr/">
 <meta property="og:title" content="Presso Center · Récupération sportive mobile à Tours">
-<meta property="og:description" content="Séances de pressothérapie au club, chez ton coach ou à domicile, dès 20 €. Réserve en ligne.">
+<meta property="og:description" content="Des bottes de pressothérapie au club, chez ton coach ou à domicile. Séances dès 20 €, réservation en ligne.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230f1623'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23c4a062' stroke-width='2.5'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="assets/styles.css">
+<link rel="stylesheet" href="assets/landing.css">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"LocalBusiness","name":"Presso Center","description":"Récupération sportive mobile : séances de pressothérapie au club, chez le coach ou à domicile.","url":"https://pressocenter.fr/","email":"contact@pressocenter.fr","areaServed":"Tours Métropole","address":{"@type":"PostalAddress","addressLocality":"Tours","addressCountry":"FR"},"priceRange":"20 € – 50 €"}
+</script>
 </head>
 <body>
-<div id="demo-banner"></div>
-<header class="pub-hero">
+
+<header class="lp-hero">
+  <svg class="lp-rings" viewBox="0 0 640 640" aria-hidden="true">
+    <circle cx="320" cy="320" r="319"/>
+    <circle cx="320" cy="320" r="232"/>
+    <circle class="gold" cx="320" cy="320" r="146"/>
+  </svg>
   <div class="wrap">
-    <div class="pub-top">
+    <div class="lp-nav">
       <a class="brand" href="./">Presso Center</a>
-      <a class="link" href="#clubs">Vous êtes un club ou un coach ?</a>
+      <nav aria-label="Navigation principale">
+        <a class="t" href="#formules-titre">Formules</a>
+        <a class="t" href="#clubs">Clubs</a>
+        <a class="t" href="#contact">Contact</a>
+        <a class="btn gold sm" href="reserver.html">Réserver</a>
+      </nav>
     </div>
-    <p class="eyebrow" style="color:var(--gold)">Récupération sportive mobile · Tours</p>
-    <h1 style="margin-top:12px">Des jambes légères, <em>là où tu t'entraînes.</em></h1>
-    <p class="lead">Séances de pressothérapie au club, chez ton coach ou à domicile. Choisis ton créneau, on te confirme par message.</p>
-    <div class="facts">
-      <span data-ic="clock">30 à 60 min</span>
-      <span data-ic="zap">dès 20 € la séance</span>
-      <span data-ic="pin">Tours Métropole</span>
+    <div class="lp-hero-body">
+      <p class="eyebrow" style="color:var(--gold)">Pressothérapie pour sportifs</p>
+      <h1>La récupération sportive <em>mobile</em> à Tours.</h1>
+      <p class="lead">On vient avec les bottes de récupération au club, chez ton coach ou à domicile. Tu réserves en ligne, on s'occupe du reste.</p>
+      <div class="lp-cta">
+        <a class="btn gold lg" href="reserver.html">Réserver une séance</a>
+        <a class="btn on-navy lg" href="#clubs">Offre clubs et coachs</a>
+      </div>
+      <a class="lp-next hide" id="next-slot" href="reserver.html"><i></i><span></span></a>
+      <div class="lp-facts">
+        <span data-ic="zap"><span>Dès <b data-from>20 €</b> la séance</span></span>
+        <span data-ic="clock">30 à 60 minutes</span>
+        <span data-ic="pin">Tours Métropole</span>
+      </div>
     </div>
   </div>
 </header>
 
-<main class="pub-main wrap" id="booking">
-  <section class="card"><p class="muted">Chargement des créneaux…</p></section>
+<main>
+  <section class="lp-sec" aria-labelledby="etapes-titre">
+    <div class="wrap">
+      <div class="lp-head">
+        <p class="eyebrow">Comment ça marche</p>
+        <h2 id="etapes-titre">Trois étapes, rien à prévoir</h2>
+        <div class="rule"></div>
+      </div>
+      <div class="lp-steps">
+        <div class="lp-step"><span class="n">01</span><h3>Tu réserves</h3><p>Choisis ta formule et ton créneau en ligne. On te confirme par message.</p></div>
+        <div class="lp-step"><span class="n">02</span><h3>On s'installe</h3><p>Au club, chez ton coach ou à domicile. Le matériel est prêt en 10 minutes.</p></div>
+        <div class="lp-step"><span class="n">03</span><h3>Tu récupères</h3><p>Tu enfiles les bottes et tu te détends, de 30 à 60 minutes selon la formule.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="lp-sec tint" aria-labelledby="presso-titre">
+    <div class="wrap lp-split">
+      <div>
+        <div class="lp-head" style="margin-bottom:0">
+          <p class="eyebrow">La pressothérapie</p>
+          <h2 id="presso-titre">Des jambes plus légères après l'effort</h2>
+          <div class="rule"></div>
+          <p>Les bottes se gonflent d'air par séquences, des pieds vers les cuisses, pour comprimer les jambes. Très utilisée dans le sport de haut niveau, cette technique devient accessible aux clubs amateurs et aux sportifs du quotidien.</p>
+        </div>
+        <ul class="bullets">
+          <li>Une récupération après l'entraînement, le match ou la compétition</li>
+          <li>Des séances courtes, à un prix accessible</li>
+          <li>Sous-bottes à usage unique et matériel désinfecté entre chaque athlète</li>
+          <li>Questionnaire de santé avant la première séance</li>
+        </ul>
+        <p class="lp-note">Récupération et bien-être sportif, sans visée médicale.</p>
+      </div>
+      <figure class="lp-boots" style="margin:0" aria-label="Illustration : les huit chambres des bottes se gonflent l'une après l'autre, des pieds vers les cuisses">
+        <div class="legs" aria-hidden="true">
+          <div class="leg"><i style="--i:7;width:92px"></i><i style="--i:6;width:88px"></i><i style="--i:5;width:82px"></i><i style="--i:4;width:74px"></i><i style="--i:3;width:68px"></i><i style="--i:2;width:62px"></i><i style="--i:1;width:56px"></i><i style="--i:0;width:78px"></i></div>
+          <div class="leg"><i style="--i:7;width:92px"></i><i style="--i:6;width:88px"></i><i style="--i:5;width:82px"></i><i style="--i:4;width:74px"></i><i style="--i:3;width:68px"></i><i style="--i:2;width:62px"></i><i style="--i:1;width:56px"></i><i style="--i:0;width:78px"></i></div>
+        </div>
+        <figcaption><b>8 chambres par botte</b> · gonflage par séquences</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="lp-sec" aria-labelledby="formules-titre">
+    <div class="wrap">
+      <div class="lp-head">
+        <p class="eyebrow">Séances individuelles</p>
+        <h2 id="formules-titre">Une formule pour chaque besoin</h2>
+        <div class="rule"></div>
+        <p>Choisis ta formule, puis ton créneau. Le règlement se fait sur place.</p>
+      </div>
+      <div class="lp-formules" id="formules"></div>
+      <div class="lp-packs" id="packs"></div>
+    </div>
+  </section>
+
+  <section class="lp-sec lp-dark" id="clubs" aria-labelledby="clubs-titre">
+    <div class="wrap">
+      <div class="lp-head">
+        <p class="eyebrow">Clubs, coachs et événements</p>
+        <h2 id="clubs-titre">La récupération vient à vos licenciés</h2>
+        <div class="rule"></div>
+        <p>On installe les bottes au club en 10 minutes, dans un vestiaire ou une salle. Vous proposez un service de récupération à vos équipes, sans acheter de matériel.</p>
+      </div>
+      <div class="lp-stats" id="club-stats"></div>
+      <div class="lp-plans" id="plans"></div>
+      <div class="lp-conds">
+        <ul class="bullets">
+          <li>Test pilote gratuit de 2 à 4 semaines</li>
+          <li>Sans engagement, préavis de 15 jours</li>
+          <li><span>−<span id="discount">10</span> % en cas d'engagement sur la saison</span></li>
+          <li>Installation offerte, facturation au club</li>
+        </ul>
+        <a class="btn gold lg" href="reserver.html#clubs">Demander un test pilote</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="lp-sec" id="contact" aria-labelledby="contact-titre">
+    <div class="wrap lp-contact">
+      <p class="eyebrow">Contact</p>
+      <h2 id="contact-titre" style="margin-top:10px">Une question ?</h2>
+      <p>Écris-nous, on te répond rapidement.</p>
+      <a class="mail" id="contact-mail" href="mailto:contact@pressocenter.fr">contact@pressocenter.fr</a>
+      <div class="lp-cta">
+        <a class="btn lg" href="reserver.html">Réserver une séance</a>
+        <a class="btn ghost lg hide" id="contact-wa" target="_blank" rel="noopener" data-ic="message">WhatsApp</a>
+      </div>
+    </div>
+  </section>
 </main>
 
-<section class="wrap" id="clubs" style="padding:0 16px"></section>
-
-<footer class="pub-foot">
-  <p>Presso Center · Récupération et bien-être sportif, sans visée médicale.</p>
-  <p style="margin-top:6px"><a href="gestion.html">Espace de gestion</a></p>
+<footer class="lp-foot">
+  <div class="wrap">
+    <span><span class="brand">Presso Center</span> · Récupération et bien-être sportif, sans visée médicale · Tours</span>
+    <nav aria-label="Liens">
+      <a href="reserver.html">Réserver</a>
+      <a href="#clubs">Clubs et coachs</a>
+      <a href="mailto:contact@pressocenter.fr">Contact</a>
+      <a href="gestion.html">Espace de gestion</a>
+    </nav>
+  </div>
 </footer>
 
 <script src="assets/config.js"></script>
 <script src="assets/vendor/supabase.js"></script>
 <script src="assets/core.js"></script>
-<script src="assets/book.js"></script>
+<script src="assets/landing.js"></script>
 </body>
 </html>

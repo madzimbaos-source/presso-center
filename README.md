@@ -2,7 +2,8 @@
 
 Application web de Presso Center, l'activité de récupération sportive mobile (pressothérapie) à Tours. Elle reprend les chiffres du business plan Adie de novembre 2026.
 
-- **`https://pressocenter.fr/`** (`index.html`) : page publique où les clients réservent. Formules et tarifs, créneaux libres selon les bottes disponibles, questionnaire de santé, autorisation parentale, ajout à l'agenda, message WhatsApp à Presso Center. Les clubs y demandent aussi un test pilote.
+- **`https://pressocenter.fr/`** (`index.html`) : page d'accueil. Présentation, formules et forfaits clubs lus en direct dans la base, prochain créneau libre, contact.
+- **`https://pressocenter.fr/reserver.html`** : page où les clients réservent. Formules et tarifs, créneaux libres selon les bottes disponibles, questionnaire de santé, autorisation parentale, ajout à l'agenda, message WhatsApp à Presso Center. Les clubs y demandent aussi un test pilote. Un lien `reserver.html?formule=plus` présélectionne une formule.
 - **`https://pressocenter.fr/gestion.html`** : espace de gestion, réservé au gérant.
   - **Accueil** : chiffre d'affaires comparé au prévisionnel, heures de la semaine sur le plafond de 16 h, liste « À faire » (demandes, séances à clôturer, paiements, stock, contrôle du matériel, mensualité Adie, seuil de TVA).
   - **Agenda** : semaine sur ordinateur, jour par jour sur téléphone ; séances, domicile, créneaux clubs, événements, indisponibilités ; confirmation et rappel par WhatsApp ; clôture d'une séance (passages, paiement, carte 10 séances).
@@ -48,11 +49,15 @@ Le bouton « Créer mon compte » de `gestion.html` fonctionne aussi, mais il d�
 
 ```
 CNAME               domaine servi par GitHub Pages
-index.html          page de réservation
+index.html          page d'accueil
+reserver.html       page de réservation
+404.html            page introuvable
 gestion.html        espace de gestion
 assets/
   config.js         connexion Supabase (vide = démo)
   core.js           catalogue, règles de créneaux, stockage local ou Supabase
+  landing.js        page d'accueil (tarifs en direct, prochain créneau)
+  landing.css       styles de la page d'accueil
   book.js           page de réservation
   admin.js          espace de gestion
   styles.css        styles (clair et sombre)
