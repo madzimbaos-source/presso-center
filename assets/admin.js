@@ -21,9 +21,16 @@
     search: '',
     txFilter: 'tout',
     showTable: false,
+    agendaMode: null,
     user: null,
     recovery: false
   };
+  try {
+    const m = localStorage.getItem('presso.agenda');
+    if (m === 'jour' || m === 'semaine') UI.agendaMode = m;
+  } catch (e) { /* stockage indisponible : affichage par défaut */ }
+  // Sans choix enregistré : le jour sur téléphone, la semaine sur grand écran
+  const agendaMode = () => UI.agendaMode || (mq.matches ? 'jour' : 'semaine');
 
   const VIEWS = {
     accueil: { label: 'Accueil', icon: 'home', render: viewHome },
@@ -508,7 +515,8 @@
     const mobile = mq.matches;
     const ws = UI.week;
     const we = PC.addDays(ws, 6);
-    const days = mobile ? [UI.day] : Array.from({ length: 7 }, (_, i) => PC.addDays(ws, i));
+    const weekMode = agendaMode() === 'semaine';
+    const days = weekMode ? Array.from({ length: 7 }, (_, i) => PC.addDays(ws, i)) : [UI.day];
     const label = ws.getMonth() === we.getMonth()
       ? ws.getDate() + ' – ' + we.getDate() + ' ' + we.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
       : PC.fmtDay(ws, { day: 'numeric', month: 'short' }) + ' – ' + PC.fmtDay(we, { day: 'numeric', month: 'short', year: 'numeric' });
@@ -528,21 +536,27 @@
         }).join('') + '</div></div>';
     }
     h += '<div class="toolbar"><span class="month-nav"><button class="btn icon sm ghost" data-act="week" data-d="-1" aria-label="Semaine précédente">' + I('left') + '</button><button class="btn sm ghost" data-act="week" data-d="0">Aujourd\'hui</button><button class="btn icon sm ghost" data-act="week" data-d="1" aria-label="Semaine suivante">' + I('right') + '</button></span>' +
+      '<div class="seg" role="group" aria-label="Affichage de l\'agenda"><button data-act="agenda-mode" data-id="jour" aria-pressed="' + !weekMode + '">Jour</button><button data-act="agenda-mode" data-id="semaine" aria-pressed="' + weekMode + '">Semaine</button></div>' +
       '<span class="grow"></span><span class="small muted">' + fmtH(wh) + ' sur ' + S.weekly_hours_cap + ' h · ' + weekB.filter((b) => b.kind === 'seance' || b.kind === 'domicile').length + ' séances · ' + weekB.filter((b) => b.kind === 'club' || b.kind === 'evenement').length + ' club / événement</span></div>';
-    if (mobile) {
+    if (!weekMode) {
       h += '<div class="days" style="margin-bottom:8px">' + Array.from({ length: 7 }, (_, i) => {
         const d = PC.addDays(ws, i);
         const n = D.bookings.filter((b) => PC.ymd(bStart(b)) === PC.ymd(d) && b.status !== 'annulee' && b.kind !== 'indispo').length;
         return '<button class="day" data-act="cal-day" data-d="' + PC.ymd(d) + '" aria-pressed="' + (PC.ymd(d) === PC.ymd(UI.day)) + '"><span class="dw">' + esc(d.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', '')) + '</span><span class="dn">' + d.getDate() + '</span><span class="df" style="color:var(--ink-3)">' + (n ? n + ' rdv' : '·') + '</span></button>';
       }).join('') + '</div>';
     }
-    h += calendar(days, mobile);
+    const compact = mobile && weekMode;
+    h += calendar(days, mobile, compact);
+    if (compact) h += '<p class="small muted" style="margin-top:8px">Touche un jour pour le voir en détail, ou une séance pour l\'ouvrir.</p>';
     h += '<div class="legend" style="margin-top:12px"><span><i class="dot" style="background:var(--c-seance)"></i>Séance</span><span><i class="dot" style="background:var(--c-domicile)"></i>À domicile</span><span><i class="dot" style="background:var(--c-club)"></i>Créneau club</span><span><i class="dot" style="background:var(--c-event)"></i>Événement</span><span><i class="dot" style="background:var(--c-indispo)"></i>Indisponible</span><span><i class="dot" style="background:var(--gold-soft);border:1px solid var(--gold)"></i>Disponible à la réservation (↻ = chaque semaine)</span><span>Bordure en pointillés : à confirmer</span></div>';
     return h;
   }
 
-  function calendar(days, mobile) {
-    const PX = mobile ? 1.1 : 0.9;
+  // « 14h » ou « 14h30 » : heure courte pour les colonnes étroites
+  const shortTime = (d) => d.getHours() + 'h' + (d.getMinutes() ? String(d.getMinutes()).padStart(2, '0') : '');
+
+  function calendar(days, mobile, compact) {
+    const PX = compact ? 0.8 : mobile ? 1.1 : 0.9;
     let minH = 9, maxH = 22;
     days.forEach((d) => {
       PC.windowsFor(d, S).forEach(([a, b]) => {
@@ -558,10 +572,18 @@
     maxH = Math.min(24, maxH);
     const startMin = minH * 60;
     const height = (maxH - minH) * 60 * PX;
-    const cols = '52px repeat(' + days.length + ', minmax(0, 1fr))';
+    const cols = (compact ? 30 : 52) + 'px repeat(' + days.length + ', minmax(0, 1fr))';
+    const multi = days.length > 1;
     const todayKey = PC.ymd(new Date());
-    let h = '<div class="cal" data-px="' + PX + '" data-start="' + startMin + '">';
-    h += '<div class="cal-head" style="grid-template-columns:' + cols + '"><div></div>' + days.map((d) => '<div class="' + (PC.ymd(d) === todayKey ? 'today' : '') + '">' + esc(d.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', '')) + '<b>' + d.getDate() + '</b></div>').join('') + '</div>';
+    let h = '<div class="cal' + (compact ? ' compact' : '') + '" data-px="' + PX + '" data-start="' + startMin + '">';
+    h += '<div class="cal-head" style="grid-template-columns:' + cols + '"><div></div>' + days.map((d) => {
+      const inner = esc(d.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', '')) + '<b>' + d.getDate() + '</b>';
+      const cls = PC.ymd(d) === todayKey ? 'today' : '';
+      // En vue semaine, l'en-tête d'un jour ouvre ce jour en détail
+      return multi
+        ? '<button class="' + cls + '" data-act="cal-open-day" data-d="' + PC.ymd(d) + '" title="Voir ce jour en détail">' + inner + '</button>'
+        : '<div class="' + cls + '">' + inner + '</div>';
+    }).join('') + '</div>';
     h += '<div class="cal-body" style="grid-template-columns:' + cols + '"><div class="cal-hours" style="height:' + height + 'px">';
     for (let hh = minH + 1; hh < maxH; hh++) h += '<span style="top:' + (hh * 60 - startMin) * PX + 'px">' + hh + 'h</span>';
     h += '</div>';
@@ -572,8 +594,13 @@
       PC.availability(d, S).forEach((w) => {
         const a = PC.atTime(d, w.from), b = PC.atTime(d, w.to);
         const t = (a.getHours() * 60 + a.getMinutes() - startMin) * PX;
-        h += '<div class="win" style="top:' + t + 'px;height:' + ((b - a) / 60000) * PX + 'px"></div>' +
-          '<button class="win-chip" data-act="edit-avail" data-type="' + w.type + '" data-i="' + w.index + '" data-day="' + key + '" style="top:' + (t + 2) + 'px" title="Modifier cette disponibilité' + (w.type === 'weekly' ? ' (chaque semaine)' : '') + '">' + (w.type === 'weekly' ? '↻ ' : '') + w.from.replace(':', 'h') + '–' + w.to.replace(':', 'h') + '</button>';
+        h += '<div class="win" style="top:' + t + 'px;height:' + ((b - a) / 60000) * PX + 'px"></div>';
+        // Colonnes étroites : simple repère d'heure, la modification se fait dans la vue du jour
+        // (masqué si une séance occupe le début de la plage, pour ne pas superposer deux textes)
+        const covered = compact && D.bookings.some((x) => x.status !== 'annulee' && PC.ymd(bStart(x)) === key && bStart(x) < a.getTime() + 25 * 60000 && bEnd(x) > a);
+        if (compact && !covered) h += '<span class="win-lab" style="top:' + (t + 1) + 'px">' + shortTime(a) + '</span>';
+        if (compact) return;
+        h += '<button class="win-chip" data-act="edit-avail" data-type="' + w.type + '" data-i="' + w.index + '" data-day="' + key + '" style="top:' + (t + 2) + 'px" title="Modifier cette disponibilité' + (w.type === 'weekly' ? ' (chaque semaine)' : '') + '">' + (w.type === 'weekly' ? '↻ ' : '') + w.from.replace(':', 'h') + '–' + w.to.replace(':', 'h') + '</button>';
       });
       const items = D.bookings
         .filter((b) => PC.ymd(bStart(b)) === key && b.status !== 'annulee')
@@ -583,11 +610,13 @@
         const b = it.b;
         const s = bStart(b);
         const top = (s.getHours() * 60 + s.getMinutes() - startMin) * PX;
-        const ht = Math.max(22, Math.min(b.duration_min, (24 * 60 - (s.getHours() * 60 + s.getMinutes()))) * PX - 2);
+        const ht = Math.max(compact ? 16 : 22, Math.min(b.duration_min, (24 * 60 - (s.getHours() * 60 + s.getMinutes()))) * PX - 2);
         const w = 100 / it.n;
         const cls = ['ev', 'k-' + b.kind, b.status === 'demande' ? 'pending' : '', b.kind === 'indispo' ? 'indispo' : '', b.status === 'terminee' || b.status === 'absent' ? 'done' : ''].join(' ');
         h += '<button class="' + cls + '" data-act="open-booking" data-id="' + b.id + '" style="top:' + top + 'px;height:' + ht + 'px;left:calc(' + w * it.lane + '% + 2px);width:calc(' + w + '% - 4px)" title="' + esc(PC.fmtTime(s) + ' · ' + bTitle(b) + ' · ' + bSub(b)) + '">' +
-          '<b>' + PC.fmtTime(s) + ' ' + esc(bTitle(b)) + '</b>' + (ht > 34 ? '<span>' + esc(bSub(b)) + '</span>' : '') + '</button>';
+          (compact
+            ? '<b>' + shortTime(s) + '</b>' + (ht > 26 ? '<span>' + esc(bTitle(b)) + '</span>' : '')
+            : '<b>' + PC.fmtTime(s) + ' ' + esc(bTitle(b)) + '</b>' + (ht > 34 ? '<span>' + esc(bSub(b)) + '</span>' : '')) + '</button>';
       });
       if (key === todayKey) {
         const n = new Date();
@@ -604,7 +633,7 @@
   function availDialog(opts) {
     opts = opts || {};
     const editing = !!opts.type;
-    const day = opts.day ? PC.parseYmd(opts.day) : (mq.matches ? UI.day : (PC.ymd(UI.week) <= PC.ymd(new Date()) && PC.ymd(new Date()) <= PC.ymd(PC.addDays(UI.week, 6)) ? PC.startOfDay(new Date()) : UI.week));
+    const day = opts.day ? PC.parseYmd(opts.day) : (agendaMode() === 'jour' ? UI.day : (PC.ymd(UI.week) <= PC.ymd(new Date()) && PC.ymd(new Date()) <= PC.ymd(PC.addDays(UI.week, 6)) ? PC.startOfDay(new Date()) : UI.week));
     let cur = null;
     if (opts.type === 'weekly') {
       const w = ((S.hours || {})[String(day.getDay())] || [])[opts.index];
@@ -1883,6 +1912,11 @@
     const col = e.target.classList && e.target.classList.contains('cal-col') ? e.target : null;
     if (col) {
       const cal = col.closest('.cal');
+      if (cal.classList.contains('compact')) {
+        UI.day = PC.parseYmd(col.dataset.day);
+        UI.agendaMode = 'jour';
+        return render();
+      }
       const PX = Number(cal.dataset.px);
       const startMin = Number(cal.dataset.start);
       const y = e.clientY - col.getBoundingClientRect().top;
@@ -1945,6 +1979,15 @@
       }
       case 'cal-day':
         UI.day = PC.parseYmd(el.dataset.d);
+        return render();
+      case 'cal-open-day':
+        // zoom ponctuel sur un jour : le choix enregistré (bouton Jour / Semaine) ne change pas
+        UI.day = PC.parseYmd(el.dataset.d);
+        UI.agendaMode = 'jour';
+        return render();
+      case 'agenda-mode':
+        UI.agendaMode = id === 'semaine' ? 'semaine' : 'jour';
+        try { localStorage.setItem('presso.agenda', UI.agendaMode); } catch (e) { /* choix non mémorisé */ }
         return render();
       case 'clients-tab':
         UI.clientsTab = id;
