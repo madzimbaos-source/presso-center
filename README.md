@@ -54,7 +54,7 @@ Le bouton « Créer mon compte » de `gestion.html` fonctionne aussi, mais il d�
 
 Tout le courrier du domaine passe par Resend.
 
-- **Réception** : un message envoyé à une adresse `@pressocenter.fr` (par exemple `contact@pressocenter.fr`) arrive chez Resend, qui prévient la fonction `mail`. Celle-ci l'enregistre dans la table `messages` (écran Messages de l'espace de gestion, en texte seul) et en envoie une copie à la boîte du gérant, pièces jointes comprises.
+- **Réception** : un message envoyé à une adresse `@pressocenter.fr` (par exemple `contact@pressocenter.fr`) arrive chez Resend, qui prévient la fonction `mail`. Si le compte Resend reçoit aussi le courrier d'autres domaines, la fonction les ignore : elle ne traite que les messages adressés au domaine de `MAIL_FROM`. Celle-ci l'enregistre dans la table `messages` (écran Messages de l'espace de gestion, en texte seul) et en envoie une copie à la boîte du gérant, pièces jointes comprises.
 - **Envoi depuis l'application** : une réponse ou un nouveau message part au nom de `contact@pressocenter.fr` par la route `/send` de la fonction, qui vérifie que l'appel vient du compte gérant.
 - **Notifications** : à chaque réservation en ligne, le gérant reçoit une alerte et le client un accusé de réception. Quand la demande passe à « confirmée », le client reçoit la confirmation. Une demande de test pilote déclenche aussi une alerte. Le client ne reçoit rien s'il n'a pas indiqué d'e-mail.
 

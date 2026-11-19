@@ -3,6 +3,7 @@
 //   POST /mail/inbound   webhook Resend « email.received » : enregistre chaque message
 //                        reçu sur @pressocenter.fr dans la table messages (messagerie
 //                        de l'espace de gestion) et en envoie une copie à NOTIFY_TO.
+//                        Les messages des autres domaines du compte Resend sont ignorés.
 //   POST /mail/send      envoi d'un message depuis l'espace de gestion, au nom de
 //                        contact@pressocenter.fr. Réservé au compte gérant.
 //   POST /mail/notify    appelé par les déclencheurs de la base (voir supabase/mail.sql) :
@@ -398,10 +399,25 @@ function toBase64(bytes: Uint8Array) {
   return btoa(bin);
 }
 
+// Le webhook Resend est commun à tous les domaines du compte : cette application
+// ne traite que les messages adressés à son propre domaine (celui de MAIL_FROM).
+// On se fie d'abord au destinataire réel de la livraison (« received_for »), qui
+// couvre aussi les copies cachées ; à défaut, aux champs À, Cc et Cci.
+const ownDomain = () => (FROM_ADDRESS().split('@')[1] ?? '').trim().toLowerCase();
+const addressesOf = (v: unknown) => (Array.isArray(v) ? v : v ? [v] : []).map((x) => parseAddress(x).email.toLowerCase());
+function isForOwnDomain(mail: Row) {
+  const suffix = `@${ownDomain()}`;
+  const envelope = addressesOf(mail.received_for);
+  const recipients = envelope.length ? envelope : [...addressesOf(mail.to), ...addressesOf(mail.cc), ...addressesOf(mail.bcc)];
+  return suffix.length > 1 && recipients.some((a) => a.endsWith(suffix));
+}
+
 async function forwardInbound(emailId: string) {
   const owner = env('NOTIFY_TO');
   if (!owner) throw new Error('NOTIFY_TO manquant');
   const mail = await resend(`/emails/receiving/${emailId}`);
+  // message d'un autre domaine du compte : ni enregistré, ni copié, ni notifié
+  if (!isForOwnDomain(mail)) return 'ignoré : autre domaine';
   const headers: Record<string, string> = {};
   for (const [k, v] of Object.entries(mail.headers ?? {})) headers[k.toLowerCase()] = String(v);
   if (headers['x-presso-forwarded']) return 'déjà transféré';
