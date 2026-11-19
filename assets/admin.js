@@ -1265,8 +1265,8 @@
     const unread = unreadCount();
     const subCount = activeSubscribers().length;
     let h = '<div class="page-head"><div><h1>Messages</h1><p>' + CONTACT_EMAIL + ' · ' + (unread ? unread + ' non lu' + (unread > 1 ? 's' : '') : 'tout est lu') + '</p></div><button class="btn" data-act="new-message">' + I('plus') + 'Nouveau message</button></div>';
-    h += '<div class="toolbar"><div class="seg" role="group"><button data-act="msg-tab" data-id="in" aria-pressed="' + (tab === 'in') + '">Reçus</button><button data-act="msg-tab" data-id="out" aria-pressed="' + (tab === 'out') + '">Envoyés</button><button data-act="msg-tab" data-id="lettre" aria-pressed="' + (tab === 'lettre') + '">Lettre' + (subCount ? ' · ' + subCount : '') + '</button></div><span class="grow"></span><button class="btn sm ghost" data-act="refresh-messages">' + I('refresh') + 'Actualiser</button></div>';
-    if (tab === 'lettre') return h + viewLetter();
+    h += '<div class="toolbar"><div class="seg" role="group"><button data-act="msg-tab" data-id="in" aria-pressed="' + (tab === 'in') + '">Reçus</button><button data-act="msg-tab" data-id="out" aria-pressed="' + (tab === 'out') + '">Envoyés</button><button data-act="msg-tab" data-id="newsletter" aria-pressed="' + (tab === 'newsletter') + '">Newsletter' + (subCount ? ' · ' + subCount : '') + '</button></div><span class="grow"></span><button class="btn sm ghost" data-act="refresh-messages">' + I('refresh') + 'Actualiser</button></div>';
+    if (tab === 'newsletter') return h + viewLetter();
     if (!list.length) return h + '<div class="empty">' + (tab === 'in' ? 'Aucun message reçu pour le moment. Les e-mails envoyés à ' + CONTACT_EMAIL + ' apparaîtront ici.' : 'Aucun message envoyé.') + '</div>';
     h += '<div class="card flat" style="padding:4px 10px"><div class="list">' + list.map((m) => {
       const who = tab === 'in' ? (m.from_name || m.from_email || 'Inconnu') : (isLetter(m) ? '' : 'À : ') + (m.to_email || '');
@@ -1452,7 +1452,7 @@
     return T;
   }
 
-  // Modèles de lettre d'information (tutoiement). « {prénom} » est remplacé à l'envoi.
+  // Modèles de newsletter (tutoiement). « {prénom} » est remplacé à l'envoi.
   function letterTemplates() {
     const brand = S.business_name || 'Presso Center';
     const url = bookingUrl();
@@ -1461,13 +1461,13 @@
     const card = (S.packs || []).find((x) => Number(x.credits) >= 10) || null;
     const cardLine = card ? card.name + ' à ' + PC.eur(card.price) + ', soit ' + PC.eur(PC.round2(card.price / card.credits)) + ' la séance' : '';
     return [
-      { id: 'lancement', label: 'Lettre de lancement (futurs clients)', subject: 'La récupération sportive arrive à Tours',
+      { id: 'lancement', label: 'Newsletter de lancement (futurs clients)', subject: 'La récupération sportive arrive à Tours',
         body: 'Bonjour {prénom},\n\n' + brand + ' ouvre ses créneaux de récupération sportive à Tours.\n\nLe principe : des bottes de pressothérapie, utilisées par les sportifs de haut niveau, qui compriment les jambes par séquences, des pieds vers les cuisses. L\'objectif : des jambes plus légères après l\'effort et une meilleure récupération entre deux entraînements.\n\nComment ça se passe :\n- tu réserves en ligne, en une minute ;\n- tu viens après ton entraînement ou ta compétition ;\n- tu t\'installes 30 à 60 minutes, et tu repars.\n\nLes formules :\n' +
           services.map((x) => '- ' + x.name + ' : ' + PC.eur(x.price) + (x.per_person ? ' par personne' : '') + ' · ' + PC.durationLabel(x.duration)).join('\n') + (cardLine ? '\n- ' + cardLine : '') +
           '\n\nLes créneaux se réservent ici : ' + url + '\n\nTu es coach ou tu fais partie d\'un club ? Réponds à cet e-mail : on propose un test pilote gratuit de 2 à 4 semaines.' + sign },
       { id: 'conseil', label: 'Conseil : récupérer après une compétition', subject: '3 réflexes pour mieux récupérer après une compétition',
         body: 'Bonjour {prénom},\n\nAprès une compétition, la récupération commence dès la ligne d\'arrivée. Trois réflexes simples :\n\n1. Bois régulièrement dans les heures qui suivent, sans attendre d\'avoir soif.\n2. Marche ou pédale tranquillement une dizaine de minutes plutôt que de t\'arrêter net.\n3. Dors : c\'est pendant le sommeil que le corps récupère le plus.\n\nBeaucoup de sportifs y ajoutent une séance de pressothérapie dans les 48 heures, pour retrouver des jambes légères.\n\nLes créneaux de la semaine sont en ligne : ' + url + sign },
-      { id: 'mois', label: 'Lettre du mois (à compléter)', subject: 'Récupération : le conseil du mois',
+      { id: 'mois', label: 'Newsletter du mois (à compléter)', subject: 'Récupération : le conseil du mois',
         body: 'Bonjour {prénom},\n\nLe conseil du mois : [ton conseil de récupération, en deux ou trois phrases].\n\nLes créneaux ouverts ce mois-ci : [jours et horaires]. Ils se réservent ici : ' + url + (cardLine ? '\n\nL\'offre du moment : ' + cardLine + '.' : '') + sign },
       { id: 'creneaux', label: 'Nouveaux créneaux ouverts', subject: 'De nouveaux créneaux sont ouverts',
         body: 'Bonjour {prénom},\n\nDe nouveaux créneaux viennent d\'ouvrir : [jours et horaires].\n\nPense à réserver tôt si tu as une compétition ce week-end : ' + url + sign }
@@ -1531,10 +1531,10 @@
     });
   }
 
-  /* ---------- Lettre d'information ---------- */
+  /* ---------- Newsletter ---------- */
   const SUB_SOURCES = { site: 'Inscrit sur le site', reservation: 'Inscrit à la réservation', manuel: 'Ajouté par toi' };
   const activeSubscribers = () => (D.subscribers || []).filter((x) => !x.unsubscribed_at);
-  const isLetter = (m) => m.direction === 'out' && /^Lettre · /.test(m.to_email || '');
+  const isLetter = (m) => m.direction === 'out' && /^(Newsletter|Lettre) · /.test(m.to_email || '');
 
   function viewLetter() {
     const subs = (D.subscribers || []).slice().sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
@@ -1542,10 +1542,10 @@
     const letters = (D.messages || []).filter(isLetter).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
     const last = letters[0];
     let h = '<div class="tiles" style="grid-template-columns:repeat(3,minmax(0,1fr))">' +
-      tile('Abonnés', String(active.length), 'Ils reçoivent la lettre', '', 'dark') +
+      tile('Abonnés', String(active.length), 'Ils reçoivent la newsletter', '', 'dark') +
       tile('Désinscrits', String(subs.length - active.length), 'Ils ne reçoivent plus rien') +
-      tile('Dernière lettre', last ? esc(msgWhen(last.created_at)) : 'Aucune', last ? esc(last.subject || '') : 'Écris la première') + '</div>';
-    h += '<div class="row wrap" style="margin:14px 0"><button class="btn" data-act="new-letter">' + I('send') + 'Écrire une lettre</button><button class="btn ghost" data-act="new-subscriber">' + I('plus') + 'Ajouter un abonné</button></div>';
+      tile('Dernière newsletter', last ? esc(msgWhen(last.created_at)) : 'Aucune', last ? esc(last.subject || '') : 'Écris la première') + '</div>';
+    h += '<div class="row wrap" style="margin:14px 0"><button class="btn" data-act="new-letter">' + I('send') + 'Écrire une newsletter</button><button class="btn ghost" data-act="new-subscriber">' + I('plus') + 'Ajouter un abonné</button></div>';
     if (active.length > 90) h += '<div class="alert warn">' + I('alert') + '<span>Plus de 90 abonnés : l\'offre gratuite du service d\'envoi est limitée à 100 e-mails par jour. Au-delà, il faut passer à l\'offre payante.</span></div>';
     h += '<div class="card flat" style="padding:4px 10px"><div class="list">' + (subs.length ? subs.map((x) => {
       const off = !!x.unsubscribed_at;
@@ -1553,7 +1553,7 @@
         '<br><span class="s">' + esc(SUB_SOURCES[x.source] || '') + ' · ' + esc(PC.fmtDay(new Date(x.created_at), { day: 'numeric', month: 'short', year: 'numeric' })) + '</span></span>' +
         '<button class="btn icon sm ghost" data-act="delete-subscriber" data-id="' + x.id + '" aria-label="Retirer ' + esc(x.email) + '">' + I('trash') + '</button></div>';
     }).join('') : '<div class="empty">Aucun abonné pour le moment. Les inscriptions viennent du site et de la case à cocher à la réservation.</div>') + '</div></div>';
-    h += '<p class="small muted" style="margin-top:10px">Chaque lettre contient un lien de désinscription. N\'ajoute à la main que des personnes qui t\'ont donné leur accord.</p>';
+    h += '<p class="small muted" style="margin-top:10px">Chaque newsletter contient un lien de désinscription. N\'ajoute à la main que des personnes qui t\'ont donné leur accord.</p>';
     return h;
   }
 
@@ -1562,12 +1562,12 @@
     const tpls = letterTemplates();
     const id = PC.uid();
     const body = '<form id="letter-form" class="stack">' +
-      '<label class="field"><span>Modèle</span><select name="tpl"><option value="">Aucun modèle (lettre libre)</option>' + tpls.map((t) => '<option value="' + t.id + '">' + esc(t.label) + '</option>').join('') + '</select></label>' +
+      '<label class="field"><span>Modèle</span><select name="tpl"><option value="">Aucun modèle (newsletter libre)</option>' + tpls.map((t) => '<option value="' + t.id + '">' + esc(t.label) + '</option>').join('') + '</select></label>' +
       '<label class="field"><span>Objet</span><input name="subject" required maxlength="200"></label>' +
-      '<label class="field"><span>Lettre</span><textarea name="body" rows="12" required></textarea><small>« {prénom} » est remplacé par le prénom de chaque abonné. Le lien de désinscription est ajouté automatiquement.</small></label>' +
+      '<label class="field"><span>Texte</span><textarea name="body" rows="12" required></textarea><small>« {prénom} » est remplacé par le prénom de chaque abonné. Le lien de désinscription est ajouté automatiquement.</small></label>' +
       '<label class="check"><input type="checkbox" name="cta" checked><span>Ajouter le bouton « Réserver une séance »</span></label>' +
       '<p class="form-error hide" id="letter-error" role="alert"></p></form>';
-    modal({ title: 'Écrire une lettre', body, wide: true, foot: '<button class="btn ghost" data-close>Annuler</button><button class="btn soft" type="button" id="letter-test">M\'envoyer un test</button><button class="btn" type="submit" form="letter-form"' + (n ? '' : ' disabled') + '>' + I('send') + (n ? 'Envoyer à ' + n + ' abonné' + (n > 1 ? 's' : '') : 'Aucun abonné') + '</button>' });
+    modal({ title: 'Écrire une newsletter', body, wide: true, foot: '<button class="btn ghost" data-close>Annuler</button><button class="btn soft" type="button" id="letter-test">M\'envoyer un test</button><button class="btn" type="submit" form="letter-form"' + (n ? '' : ' disabled') + '>' + I('send') + (n ? 'Envoyer à ' + n + ' abonné' + (n > 1 ? 's' : '') : 'Aucun abonné') + '</button>' });
     const form = $('#letter-form');
     const err = $('#letter-error');
     bindTemplates(form, tpls);
@@ -1582,7 +1582,7 @@
         err.classList.remove('hide');
         return;
       }
-      if (!test && !window.confirm('Envoyer cette lettre à ' + n + ' abonné' + (n > 1 ? 's' : '') + ' ? Une fois partie, elle ne peut pas être rappelée.')) return;
+      if (!test && !window.confirm('Envoyer cette newsletter à ' + n + ' abonné' + (n > 1 ? 's' : '') + ' ? Une fois partie, elle ne peut pas être rappelée.')) return;
       const buttons = $$('.modal-foot button');
       buttons.forEach((x) => (x.disabled = true));
       try {
@@ -1597,7 +1597,7 @@
           D.messages.push(out.message);
         }
         closeModal();
-        PC.toast('Lettre envoyée à ' + out.sent + ' abonné' + (out.sent > 1 ? 's' : '') + (out.failed ? ' · ' + out.failed + ' échec' + (out.failed > 1 ? 's' : '') : ''), out.failed ? 'bad' : undefined);
+        PC.toast('Newsletter envoyée à ' + out.sent + ' abonné' + (out.sent > 1 ? 's' : '') + (out.failed ? ' · ' + out.failed + ' échec' + (out.failed > 1 ? 's' : '') : ''), out.failed ? 'bad' : undefined);
         render();
       } catch (e) {
         err.textContent = e.message || 'Envoi impossible.';
@@ -1615,7 +1615,7 @@
   function subscriberDialog() {
     const body = '<form id="sub-form" class="stack"><label class="field"><span>Adresse e-mail</span><input type="email" name="email" required maxlength="160" placeholder="prenom@exemple.fr"></label>' +
       '<label class="field"><span>Prénom (facultatif)</span><input name="name" maxlength="120"></label>' +
-      '<p class="small muted">N\'ajoute que des personnes qui ont accepté de recevoir la lettre. Elles pourront se désinscrire en un clic.</p><p class="form-error hide" id="sub-error" role="alert"></p></form>';
+      '<p class="small muted">N\'ajoute que des personnes qui ont accepté de recevoir la newsletter. Elles pourront se désinscrire en un clic.</p><p class="form-error hide" id="sub-error" role="alert"></p></form>';
     modal({ title: 'Ajouter un abonné', body, foot: '<button class="btn ghost" data-close>Annuler</button><button class="btn" type="submit" form="sub-form">Ajouter</button>' });
     const form = $('#sub-form');
     form.addEventListener('submit', async (e) => {

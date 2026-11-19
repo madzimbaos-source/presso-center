@@ -163,7 +163,7 @@
       html += '<div class="health"><b>Questionnaire de santé</b><p class="small muted" style="margin-top:4px">La pressothérapie est déconseillée en cas de :</p><ul>' + PC.CONTRAINDICATIONS.map((c) => '<li>' + esc(c) + '</li>').join('') + '</ul>' +
         '<label class="check"><input type="checkbox" name="health_ack" required><span>Je ne suis concerné(e) par aucune de ces situations. En cas de doute, je demande d\'abord l\'avis de mon médecin.</span></label></div>';
       html += '<label class="check"><input type="checkbox" name="credit"><span>J\'ai une carte 10 séances ou un abonnement : décompter cette séance.</span></label>';
-      html += '<label class="check"><input type="checkbox" name="newsletter"><span>Je veux recevoir les conseils et les offres de Presso Center par e-mail, une lettre par mois au plus.</span></label>';
+      html += '<label class="check"><input type="checkbox" name="newsletter"><span>Je veux recevoir les conseils et les offres de Presso Center par e-mail, une newsletter par mois au plus.</span></label>';
       html += '<div class="summary"><div class="row between"><span>' + esc(st.svc.name) + (st.svc.per_person ? ' × ' + st.people : '') + '</span><span class="tnum">' + PC.durationLabel(st.svc.duration) + '</span></div>' +
         '<div class="row between"><span>' + esc(PC.capitalize(PC.fmtDayLong(st.slot))) + '</span><span class="tnum">' + PC.fmtTime(st.slot) + ' – ' + PC.fmtTime(end) + '</span></div>' +
         '<div class="row between"><span class="tot">À régler sur place</span><span class="tot tnum">' + PC.eur(priceOf()) + '</span></div>' +
@@ -291,7 +291,7 @@
       health_ack: !!f.get('health_ack'),
       payment_mode: f.get('credit') ? 'credit' : 'unitaire'
     };
-    // Lettre d'information : seulement si la case est cochée et qu'une adresse est donnée
+    // Newsletter : seulement si la case est cochée et qu'une adresse est donnée
     p.newsletter = !!f.get('newsletter');
     const formVals = { name: p.name, phone: p.phone, email: p.email, sport: p.sport, address: p.address, notes: p.notes };
     let err = '';
@@ -315,7 +315,7 @@
       delete p.newsletter;
       const res = await store.book(p);
       remember.set({ name: p.name, phone: p.phone, email: p.email, sport: p.sport });
-      // l'inscription à la lettre ne doit jamais faire échouer une réservation
+      // l'inscription à la newsletter ne doit jamais faire échouer une réservation
       if (wantsLetter) store.subscribe({ email: p.email, name: p.name.split(/\s+/)[0], source: 'reservation' }).catch(() => {});
       st.sending = false;
       renderConfirm(res, p);

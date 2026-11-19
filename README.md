@@ -78,11 +78,11 @@ DNS : le domaine doit être vérifié chez Resend (DKIM, SPF sur `send`, MX de r
 
 Pour diagnostiquer : `select * from net._http_response order by id desc limit 5;` montre les dernières réponses de la fonction.
 
-## Lettre d'information
+## Newsletter
 
 - **Abonnés** : table `subscribers` (`supabase/newsletter.sql`). On s'inscrit sur la page d'accueil ou en cochant la case à la réservation ; le gérant peut aussi ajouter une personne qui a donné son accord. Rien n'est envoyé au moment de l'inscription.
-- **Envoi** : onglet Messages → Lettre. « M'envoyer un test » n'écrit qu'au gérant ; l'envoi à la liste passe par la route `/newsletter` de la fonction, réservée au compte gérant, par lots de 100. `{prénom}` est remplacé par le prénom de l'abonné.
-- **Désinscription** : chaque lettre contient un lien personnel vers `desinscription.html` (un clic de confirmation sur la page) et l'en-tête `List-Unsubscribe` pour le bouton des messageries (route `/unsubscribe`). Une personne désinscrite ne peut pas être réajoutée à la main.
+- **Envoi** : onglet Messages → Newsletter. « M'envoyer un test » n'écrit qu'au gérant ; l'envoi à la liste passe par la route `/newsletter` de la fonction, réservée au compte gérant, par lots de 100. `{prénom}` est remplacé par le prénom de l'abonné.
+- **Désinscription** : chaque newsletter contient un lien personnel vers `desinscription.html` (un clic de confirmation sur la page) et l'en-tête `List-Unsubscribe` pour le bouton des messageries (route `/unsubscribe`). Une personne désinscrite ne peut pas être réajoutée à la main.
 
 ## Notifications sur le téléphone
 
@@ -104,7 +104,7 @@ L'espace de gestion est installable (`manifest.webmanifest`) et peut envoyer des
 CNAME               domaine servi par GitHub Pages
 index.html          page d'accueil
 mentions-legales.html, confidentialite.html   pages légales
-desinscription.html désinscription de la lettre d'information
+desinscription.html désinscription de la newsletter
 manifest.webmanifest, sw.js   application installable et notifications
 reserver.html       page de réservation
 404.html            page introuvable
@@ -124,9 +124,9 @@ supabase/
   schema.sql        tables, RLS, fonctions
   mail.sql          déclencheurs d'e-mails
   messages.sql      table de la messagerie
-  newsletter.sql    abonnés à la lettre, inscription et désinscription
+  newsletter.sql    abonnés à la newsletter, inscription et désinscription
   push.sql          appareils abonnés aux notifications
-  functions/mail/   fonction Edge : e-mails, lettre d'information, notifications push
+  functions/mail/   fonction Edge : e-mails, newsletter, notifications push
   seed.sql          réglages et tarifs du plan, bottes, consommables, partenaires
 ```
 

@@ -1,8 +1,8 @@
 -- =====================================================================
--- Presso Center : lettre d'information
+-- Presso Center : newsletter
 --
 -- Les abonnés s'inscrivent eux-mêmes (formulaire du site, case à cocher à la
--- réservation) ou sont ajoutés par le gérant avec leur accord. Chaque lettre
+-- réservation) ou sont ajoutés par le gérant avec leur accord. Chaque newsletter
 -- contient un lien de désinscription personnel (jeton).
 --
 -- L'envoi passe par la fonction Edge « mail » (route /newsletter), réservée
@@ -58,7 +58,7 @@ begin
 end;
 $$;
 
--- Désinscription avec le jeton reçu dans chaque lettre
+-- Désinscription avec le jeton reçu dans chaque newsletter
 create or replace function public.newsletter_unsubscribe(p_token uuid)
 returns jsonb
 language plpgsql

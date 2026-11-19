@@ -92,7 +92,7 @@
       try {
         await getStore().subscribe({ email, source: 'site' });
         letter.elements.email.value = '';
-        say('C\'est noté : tu recevras la prochaine lettre.', 'good');
+        say('C\'est noté : tu recevras la prochaine newsletter.', 'good');
       } catch (err) {
         say(err.message || 'Inscription impossible pour le moment.', 'bad');
       }

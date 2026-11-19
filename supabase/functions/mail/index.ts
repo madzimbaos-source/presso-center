@@ -7,9 +7,9 @@
 //                        contact@pressocenter.fr. Réservé au compte gérant.
 //   POST /mail/notify    appelé par les déclencheurs de la base (voir supabase/mail.sql) :
 //                        nouvelle réservation, réservation confirmée, demande de club.
-//   POST /mail/newsletter  envoi de la lettre d'information aux abonnés (ou d'un test au
+//   POST /mail/newsletter  envoi de la newsletter aux abonnés (ou d'un test au
 //                        gérant). Réservé au compte gérant.
-//   GET|POST /mail/unsubscribe?t=<jeton>  désinscription de la lettre : GET renvoie vers la
+//   GET|POST /mail/unsubscribe?t=<jeton>  désinscription de la newsletter : GET renvoie vers la
 //                        page du site, POST désinscrit en un clic (en-tête List-Unsubscribe).
 //   POST /mail/push-test notification de test sur les appareils du gérant.
 //
@@ -518,7 +518,7 @@ async function sendFromApp(p: Record<string, any>) {
   return rows?.[0] ?? null;
 }
 
-// ---------------------------------------------------------------- Lettre d'information
+// ---------------------------------------------------------------- Newsletter
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PLACEHOLDER_RE = /\[[^\]\n]{1,60}\]/;
 
@@ -547,7 +547,7 @@ function newsletterEmail(subject: string, body: string, cta: boolean, r: { email
 ${richText(text)}
 ${cta ? `<p style="margin:4px 0 0"><a href="${esc(SITE())}/reserver.html" style="display:inline-block;background:#c4a062;color:#0f1623;text-decoration:none;font-weight:700;font-size:15px;padding:13px 22px;border-radius:999px">Réserver une séance</a></p>` : ''}
 </td></tr>
-<tr><td style="padding:16px 8px;text-align:center;font-size:12px;line-height:1.6;color:#626977">Presso Center · Récupération sportive · Tours · <a href="${esc(SITE())}" style="color:#626977">${esc(SITE().replace(/^https?:\/\//, ''))}</a><br>Tu reçois cette lettre parce que tu t'es inscrit(e) sur le site ou lors d'une réservation. <a href="${esc(page)}" style="color:#626977">Se désinscrire</a></td></tr>
+<tr><td style="padding:16px 8px;text-align:center;font-size:12px;line-height:1.6;color:#626977">Presso Center · Récupération sportive · Tours · <a href="${esc(SITE())}" style="color:#626977">${esc(SITE().replace(/^https?:\/\//, ''))}</a><br>Tu reçois cette newsletter parce que tu t'es inscrit(e) sur le site ou lors d'une réservation. <a href="${esc(page)}" style="color:#626977">Se désinscrire</a></td></tr>
 </table></td></tr></table></body></html>`;
   return {
     from: FROM(), to: [r.email], reply_to: FROM_ADDRESS(), subject: (test ? '[Test] ' : '') + subject, html,
@@ -564,8 +564,8 @@ async function sendNewsletter(p: Record<string, any>, user: { email?: string }) 
   const id = String(p.id ?? '');
   const test = p.test === true;
   if (!subject || subject.length > 200) throw new Error("L'objet est obligatoire (200 caractères maximum).");
-  if (!body || body.length > 20000) throw new Error('La lettre est vide ou trop longue.');
-  if (!UUID_RE.test(id)) throw new Error('Identifiant de la lettre manquant.');
+  if (!body || body.length > 20000) throw new Error('La newsletter est vide ou trop longue.');
+  if (!UUID_RE.test(id)) throw new Error('Identifiant de la newsletter manquant.');
   if (PLACEHOLDER_RE.test(subject) || PLACEHOLDER_RE.test(body)) throw new Error('Il reste un passage entre crochets à compléter.');
 
   let recipients: { email: string; name?: string | null; token?: string | null }[];
@@ -616,7 +616,7 @@ async function sendNewsletter(p: Record<string, any>, user: { email?: string }) 
     const rows = await db('/messages?on_conflict=id', {
       method: 'POST',
       prefer: 'resolution=merge-duplicates,return=representation',
-      body: { id, direction: 'out', from_name: 'Presso Center', from_email: FROM_ADDRESS(), to_email: `Lettre · ${sent} abonné${sent > 1 ? 's' : ''}`, subject, body, read: true },
+      body: { id, direction: 'out', from_name: 'Presso Center', from_email: FROM_ADDRESS(), to_email: `Newsletter · ${sent} abonné${sent > 1 ? 's' : ''}`, subject, body, read: true },
     });
     message = rows?.[0] ?? null;
   }
@@ -633,7 +633,7 @@ Deno.serve(async (req) => {
   if (appRoute && req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(req) });
 
   try {
-    // Désinscription de la lettre : lien cliqué (GET) ou bouton du logiciel de messagerie (POST)
+    // Désinscription de la newsletter : lien cliqué (GET) ou bouton du logiciel de messagerie (POST)
     if (path.endsWith('/unsubscribe')) {
       const token = url.searchParams.get('t') ?? '';
       if (!UUID_RE.test(token)) return json({ ok: false, error: 'Lien invalide' }, 400);

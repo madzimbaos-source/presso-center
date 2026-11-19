@@ -753,7 +753,7 @@
         save();
         return JSON.parse(JSON.stringify(row));
       },
-      // Lettre d'information (démo : rien ne part réellement)
+      // Newsletter (démo : rien ne part réellement)
       async subscribe(p) {
         const d = load();
         const email = String(p.email || '').trim().toLowerCase();
@@ -780,7 +780,7 @@
         if (p.test) return { ok: true, sent: 1, failed: 0, total: 1, to: 'mode démo', message: null };
         const n = (d.subscribers || []).filter((x) => !x.unsubscribed_at).length;
         if (!n) throw new Error("Aucun abonné pour l'instant.");
-        const row = { id: p.id || PC.uid(), direction: 'out', from_name: 'Presso Center', from_email: 'contact@pressocenter.fr', to_email: 'Lettre · ' + n + ' abonné' + (n > 1 ? 's' : ''), subject: p.subject, body: p.body, attachments: [], reply_to_id: null, read: true, created_at: new Date().toISOString() };
+        const row = { id: p.id || PC.uid(), direction: 'out', from_name: 'Presso Center', from_email: 'contact@pressocenter.fr', to_email: 'Newsletter · ' + n + ' abonné' + (n > 1 ? 's' : ''), subject: p.subject, body: p.body, attachments: [], reply_to_id: null, read: true, created_at: new Date().toISOString() };
         (d.messages = d.messages || []).push(row);
         save();
         return { ok: true, sent: n, failed: 0, total: n, to: null, message: JSON.parse(JSON.stringify(row)) };
@@ -925,7 +925,7 @@
       async sendMail(p) {
         return (await callFn('send', Object.assign({ id: PC.uid() }, p))).message;
       },
-      // Lettre d'information
+      // Newsletter
       async subscribe(p) {
         const { data, error } = await sb.rpc('newsletter_subscribe', { p });
         fail(error);
