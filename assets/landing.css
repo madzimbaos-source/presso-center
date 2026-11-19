@@ -3,9 +3,6 @@ html { scroll-behavior: smooth; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
 .lp-hero { position: relative; overflow: hidden; background: var(--navy); color: var(--on-navy); padding: 20px 20px 0; }
-.lp-rings { position: absolute; right: -150px; top: 30px; width: 640px; height: 640px; pointer-events: none; }
-.lp-rings circle { fill: none; stroke: rgba(244, 241, 234, 0.11); stroke-width: 1; }
-.lp-rings circle.gold { stroke: var(--gold); stroke-opacity: 0.8; stroke-width: 1.5; }
 .lp-hero .wrap { position: relative; z-index: 1; }
 
 .lp-nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 44px; }
@@ -13,7 +10,17 @@ html { scroll-behavior: smooth; }
 .lp-nav nav a.t { color: var(--on-navy-2); text-decoration: none; font-size: 14px; font-weight: 600; }
 .lp-nav nav a.t:hover { color: var(--on-navy); }
 
-.lp-hero-body { padding: 72px 0 96px; }
+.lp-hero-body { padding: 76px 0 84px; min-height: 620px; display: flex; flex-direction: column; justify-content: center; }
+.lp-hero-text { max-width: 600px; }
+/* Photo à droite, fondue dans le bleu nuit pour garder le texte lisible */
+.lp-hero-img { position: absolute; top: 0; right: 0; bottom: 0; width: 62%; margin: 0; z-index: 0; }
+.lp-hero-img img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 74% 30%; }
+.lp-hero-img::after { content: ''; position: absolute; inset: 0; background:
+  linear-gradient(90deg, var(--navy) 0%, color-mix(in srgb, var(--navy) 78%, transparent) 30%, color-mix(in srgb, var(--navy) 18%, transparent) 66%, color-mix(in srgb, var(--navy) 6%, transparent) 100%),
+  linear-gradient(0deg, var(--navy) 0%, transparent 24%),
+  linear-gradient(180deg, color-mix(in srgb, var(--navy) 70%, transparent) 0%, transparent 20%); }
+.lp-photo img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 22px; background: var(--navy-2); }
+.lp-club-top { margin-bottom: 36px; }
 .lp-hero h1 { margin-top: 14px; font-size: clamp(40px, 8.6vw, 78px); line-height: 1.02; font-weight: 800; letter-spacing: -0.035em; max-width: 11ch; }
 .lp-hero h1 em { font-style: normal; color: var(--gold); }
 .lp-hero .lead { margin-top: 22px; max-width: 33rem; font-size: 18px; line-height: 1.55; color: var(--on-navy-2); }
@@ -47,6 +54,21 @@ html { scroll-behavior: smooth; }
 .lp-split { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); gap: 48px; align-items: center; }
 .lp-split .bullets { margin-top: 22px; font-size: 16px; gap: 10px; }
 .lp-note { margin-top: 22px; font-size: 13px; color: var(--ink-3); }
+
+.lp-head p + p { margin-top: 12px; }
+.lp-benefits { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.lp-benefit { padding: 24px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); }
+.lp-benefit .ico { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: var(--gold-soft); color: var(--gold-ink); }
+.lp-benefit .ico .ic { width: 22px; height: 22px; }
+.lp-benefit h3 { margin-top: 16px; font-size: 18px; font-weight: 700; }
+.lp-benefit p { margin-top: 8px; color: var(--ink-2); }
+.lp-when { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 28px; font-size: 14px; }
+.lp-when b { margin-right: 6px; font-size: 15px; }
+.lp-when span { padding: 7px 14px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); font-weight: 500; }
+.lp-safe { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 16px; margin-top: 28px; }
+.lp-safe > div { padding: 20px 22px; border-radius: 16px; background: var(--surface-2); }
+.lp-safe h3 { font-size: 15px; font-weight: 700; }
+.lp-safe p { margin-top: 6px; font-size: 14px; color: var(--ink-2); }
 
 /* Visuel : les 8 chambres des bottes, gonflées par séquences des pieds vers les cuisses */
 .lp-boots { position: relative; background: var(--navy); color: var(--on-navy); border-radius: 24px; padding: 34px 28px 26px; overflow: hidden; }
@@ -109,13 +131,23 @@ html { scroll-behavior: smooth; }
 
 @media (max-width: 900px) {
   .lp-split { grid-template-columns: 1fr; gap: 32px; }
+  .lp-benefits { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lp-hero-body { min-height: 0; padding: 56px 0 40px; }
+  .lp-hero-text { max-width: none; }
+  .lp-hero-img { position: relative; width: auto; margin: 0 0 40px; }
+  .lp-hero-img img { height: auto; aspect-ratio: 16 / 9; border-radius: 22px; object-position: center; }
+  .lp-hero-img::after { display: none; }
   .lp-plans { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .lp-steps { grid-template-columns: 1fr; }
 }
 @media (max-width: 640px) {
   .lp-nav nav a.t { display: none; }
-  .lp-rings { right: -330px; top: 150px; opacity: 0.75; }
-  .lp-hero-body { padding: 52px 0 64px; }
+  .lp-hero-body { padding: 44px 0 32px; }
+  .lp-hero-img { margin-bottom: 32px; }
+  .lp-hero-img img { border-radius: 18px; }
+  .lp-benefits { grid-template-columns: 1fr; gap: 12px; }
+  .lp-benefit { padding: 20px; }
+  .lp-safe { grid-template-columns: 1fr; }
   .lp-sec { padding: 60px 20px; }
   .lp-cta .btn.lg { flex: 1 1 100%; }
   .lp-stats { grid-template-columns: 1fr; }

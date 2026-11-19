@@ -13,6 +13,10 @@
 <meta property="og:url" content="https://pressocenter.fr/">
 <meta property="og:title" content="Presso Center · Récupération sportive mobile à Tours">
 <meta property="og:description" content="Des bottes de pressothérapie au club, chez ton coach ou à domicile. Séances dès 20 €, réservation en ligne.">
+<meta property="og:image" content="https://pressocenter.fr/assets/img/hero.jpg">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="720">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230f1623'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23c4a062' stroke-width='2.5'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,15 +30,11 @@
 <body>
 
 <header class="lp-hero">
-  <svg class="lp-rings" viewBox="0 0 640 640" aria-hidden="true">
-    <circle cx="320" cy="320" r="319"/>
-    <circle cx="320" cy="320" r="232"/>
-    <circle class="gold" cx="320" cy="320" r="146"/>
-  </svg>
   <div class="wrap">
     <div class="lp-nav">
       <a class="brand" href="./">Presso Center</a>
       <nav aria-label="Navigation principale">
+        <a class="t" href="#bienfaits">Bienfaits</a>
         <a class="t" href="#formules-titre">Formules</a>
         <a class="t" href="#clubs">Clubs</a>
         <a class="t" href="#contact">Contact</a>
@@ -42,14 +42,16 @@
       </nav>
     </div>
     <div class="lp-hero-body">
-      <p class="eyebrow" style="color:var(--gold)">Pressothérapie pour sportifs</p>
-      <h1>La récupération sportive <em>mobile</em> à Tours.</h1>
-      <p class="lead">On vient avec les bottes de récupération au club, chez ton coach ou à domicile. Tu réserves en ligne, on s'occupe du reste.</p>
-      <div class="lp-cta">
-        <a class="btn gold lg" href="reserver.html">Réserver une séance</a>
-        <a class="btn on-navy lg" href="#clubs">Offre clubs et coachs</a>
+      <div class="lp-hero-text">
+        <p class="eyebrow" style="color:var(--gold)">Pressothérapie pour sportifs</p>
+        <h1>La récupération sportive <em>mobile</em> à Tours.</h1>
+        <p class="lead">On vient avec les bottes de récupération au club, chez ton coach ou à domicile. Tu réserves en ligne, on s'occupe du reste.</p>
+        <div class="lp-cta">
+          <a class="btn gold lg" href="reserver.html">Réserver une séance</a>
+          <a class="btn on-navy lg" href="#clubs">Offre clubs et coachs</a>
+        </div>
+        <a class="lp-next hide" id="next-slot" href="reserver.html"><i></i><span></span></a>
       </div>
-      <a class="lp-next hide" id="next-slot" href="reserver.html"><i></i><span></span></a>
       <div class="lp-facts">
         <span data-ic="zap"><span>Dès <b data-from>20 €</b> la séance</span></span>
         <span data-ic="clock">30 à 60 minutes</span>
@@ -57,6 +59,9 @@
       </div>
     </div>
   </div>
+  <figure class="lp-hero-img">
+    <img src="assets/img/hero.jpg" width="1280" height="720" alt="Un sportif se détend sur un banc de vestiaire, les deux jambes dans des bottes de pressothérapie" fetchpriority="high">
+  </figure>
 </header>
 
 <main>
@@ -80,17 +85,11 @@
       <div>
         <div class="lp-head" style="margin-bottom:0">
           <p class="eyebrow">La pressothérapie</p>
-          <h2 id="presso-titre">Des jambes plus légères après l'effort</h2>
+          <h2 id="presso-titre">Des bottes qui massent les jambes par vagues</h2>
           <div class="rule"></div>
-          <p>Les bottes se gonflent d'air par séquences, des pieds vers les cuisses, pour comprimer les jambes. Très utilisée dans le sport de haut niveau, cette technique devient accessible aux clubs amateurs et aux sportifs du quotidien.</p>
+          <p>Tu enfiles deux bottes qui montent jusqu'en haut des cuisses. Elles se gonflent d'air chambre après chambre, des pieds vers les cuisses, puis se relâchent. Cette compression par séquences agit comme un massage régulier et profond.</p>
+          <p>Très utilisée dans le sport de haut niveau, la technique devient accessible aux clubs amateurs et aux sportifs du quotidien.</p>
         </div>
-        <ul class="bullets">
-          <li>Une récupération après l'entraînement, le match ou la compétition</li>
-          <li>Des séances courtes, à un prix accessible</li>
-          <li>Sous-bottes à usage unique et matériel désinfecté entre chaque athlète</li>
-          <li>Questionnaire de santé avant la première séance</li>
-        </ul>
-        <p class="lp-note">Récupération et bien-être sportif, sans visée médicale.</p>
       </div>
       <figure class="lp-boots" style="margin:0" aria-label="Illustration : les huit chambres des bottes se gonflent l'une après l'autre, des pieds vers les cuisses">
         <div class="legs" aria-hidden="true">
@@ -99,6 +98,32 @@
         </div>
         <figcaption><b>8 chambres par botte</b> · gonflage par séquences</figcaption>
       </figure>
+    </div>
+  </section>
+
+  <section class="lp-sec" id="bienfaits" aria-labelledby="bienfaits-titre">
+    <div class="wrap">
+      <div class="lp-head">
+        <p class="eyebrow">Les bienfaits</p>
+        <h2 id="bienfaits-titre">Ce que la pressothérapie apporte aux sportifs</h2>
+        <div class="rule"></div>
+      </div>
+      <div class="lp-benefits">
+        <div class="lp-benefit"><span class="ico" data-ic="zap"></span><h3>Des jambes plus légères</h3><p>La compression soulage la sensation de jambes lourdes après un entraînement, un match ou une compétition.</p></div>
+        <div class="lp-benefit"><span class="ico" data-ic="wave"></span><h3>Une circulation stimulée</h3><p>Le gonflage progressif, des pieds vers les cuisses, favorise le retour veineux et lymphatique.</p></div>
+        <div class="lp-benefit"><span class="ico" data-ic="check"></span><h3>Des courbatures atténuées</h3><p>Après un gros effort, une séance peut aider à réduire les courbatures ressenties les jours suivants.</p></div>
+        <div class="lp-benefit"><span class="ico" data-ic="clock"></span><h3>Un vrai temps de détente</h3><p>De 30 à 60 minutes assis ou allongé, sans rien faire : les jambes et la tête relâchent.</p></div>
+        <div class="lp-benefit"><span class="ico" data-ic="calendar"></span><h3>Mieux enchaîner les séances</h3><p>En période de charge ou entre deux matchs, on repart avec de meilleures sensations.</p></div>
+        <div class="lp-benefit"><span class="ico" data-ic="users"></span><h3>Pour tous les sports</h3><p>Football, course à pied, judo, rugby, basket, fitness : dès que les jambes travaillent.</p></div>
+      </div>
+      <div class="lp-when">
+        <b>Quand faire une séance ?</b>
+        <span>Après un entraînement intense</span><span>Après un match ou une compétition</span><span>Pendant une semaine chargée</span>
+      </div>
+      <div class="lp-safe">
+        <div><h3>Hygiène</h3><p>Sous-bottes à usage unique pour chaque athlète, matériel désinfecté entre deux passages.</p></div>
+        <div><h3>Bon à savoir</h3><p>La pressothérapie est une pratique de récupération et de bien-être, sans visée médicale. Les effets ressentis varient d'une personne à l'autre. Elle est déconseillée dans certaines situations (phlébite, troubles cardiaques, grossesse…) : on te fait remplir un questionnaire de santé avant la première séance.</p></div>
+      </div>
     </div>
   </section>
 
@@ -117,11 +142,16 @@
 
   <section class="lp-sec lp-dark" id="clubs" aria-labelledby="clubs-titre">
     <div class="wrap">
-      <div class="lp-head">
-        <p class="eyebrow">Clubs, coachs et événements</p>
-        <h2 id="clubs-titre">La récupération vient à vos licenciés</h2>
-        <div class="rule"></div>
-        <p>On installe les bottes au club en 10 minutes, dans un vestiaire ou une salle. Vous proposez un service de récupération à vos équipes, sans acheter de matériel.</p>
+      <div class="lp-split lp-club-top">
+        <div class="lp-head" style="margin-bottom:0">
+          <p class="eyebrow">Clubs, coachs et événements</p>
+          <h2 id="clubs-titre">La récupération vient à vos licenciés</h2>
+          <div class="rule"></div>
+          <p>On installe les bottes au club en 10 minutes, dans un vestiaire ou une salle. Vous proposez un service de récupération à vos équipes, sans acheter de matériel.</p>
+        </div>
+        <figure class="lp-photo" style="margin:0">
+          <img src="assets/img/clubs.jpg" width="1280" height="720" loading="lazy" alt="Trois sportifs assis côte à côte dans un vestiaire de club, les jambes dans des bottes de pressothérapie">
+        </figure>
       </div>
       <div class="lp-stats" id="club-stats"></div>
       <div class="lp-plans" id="plans"></div>
@@ -153,7 +183,7 @@
 
 <footer class="lp-foot">
   <div class="wrap">
-    <span><span class="brand">Presso Center</span> · Récupération et bien-être sportif, sans visée médicale · Tours</span>
+    <span><span class="brand">Presso Center</span> · Récupération et bien-être sportif, sans visée médicale · Tours<br>Photos d'illustration générées par IA.</span>
     <nav aria-label="Liens">
       <a href="reserver.html">Réserver</a>
       <a href="#clubs">Clubs et coachs</a>
