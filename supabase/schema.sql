@@ -222,7 +222,7 @@ set search_path = ''
 as $$
   select coalesce(
       (select jsonb_object_agg(k, s.data -> k)
-         from unnest(array['business_name', 'phone', 'email', 'city', 'base_location', 'hours', 'open_slots',
+         from unnest(array['business_name', 'phone', 'email', 'city', 'base_location', 'legal', 'hours', 'open_slots',
                            'slot_step', 'rotation_min', 'travel_min', 'min_notice_hours', 'max_days_ahead',
                            'services', 'packs', 'club_plans', 'club_options', 'season_discount']) as k
         where s.data ? k),

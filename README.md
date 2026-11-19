@@ -16,6 +16,11 @@ Application web de Presso Center, l'activité de récupération sportive mobile 
 
 Le site est statique (HTML, CSS, JavaScript), sans étape de compilation. GitHub Pages le sert tel quel depuis la branche `main`, sur le domaine déclaré dans le fichier `CNAME`.
 
+## Pages légales
+
+- `mentions-legales.html` et `confidentialite.html`. L'identité de l'éditeur (nom, statut, SIRET, adresse, médiateur) se saisit dans Réglages → Informations légales et s'affiche automatiquement.
+- Le site ne charge aucune ressource tierce : la police Inter est hébergée dans `assets/fonts/`. Aucun cookie ni outil de mesure d'audience.
+
 ## Lieu des séances
 
 Les formules individuelles ont lieu sur place, chez Presso Center. Le site n'affiche qu'un lieu vague (`base_location`). L'adresse exacte (`reception_address`, réglage privé) n'est jamais exposée publiquement : elle est envoyée au client dans l'e-mail et le message de confirmation. La formule « À domicile » reste un déplacement chez le client.
@@ -81,6 +86,7 @@ Pour diagnostiquer : `select * from net._http_response order by id desc limit 5;
 ```
 CNAME               domaine servi par GitHub Pages
 index.html          page d'accueil
+mentions-legales.html, confidentialite.html   pages légales
 reserver.html       page de réservation
 404.html            page introuvable
 gestion.html        espace de gestion

@@ -24,6 +24,8 @@
       '1': [['18:00', '21:30']],
       '0': [['14:00', '19:00']]
     },
+    // Informations des mentions légales (publiques)
+    legal: { name: '', status: 'Entrepreneur individuel (micro-entreprise)', siret: '', address: '', mediator: '' },
     // Disponibilités ponctuelles, en plus des plages de chaque semaine : { date, from, to }
     open_slots: [],
     slot_step: 15,
@@ -243,7 +245,9 @@
   PC.clubPlan = (s, code) => (s.club_plans || []).find((x) => x.code === code);
   PC.mergeSettings = function (data) {
     const d = JSON.parse(JSON.stringify(PC.DEFAULT_SETTINGS));
-    return Object.assign(d, data || {});
+    const out = Object.assign(d, data || {});
+    out.legal = Object.assign({}, PC.DEFAULT_SETTINGS.legal, (data && data.legal) || {});
+    return out;
   };
 
   /* ------------------------------------------------------------------
@@ -380,7 +384,7 @@
   };
 
   PC.publicSubset = function (s, capacity) {
-    const keys = ['business_name', 'phone', 'email', 'city', 'base_location', 'hours', 'open_slots', 'slot_step', 'rotation_min', 'travel_min', 'min_notice_hours', 'max_days_ahead', 'services', 'packs', 'club_plans', 'club_options', 'season_discount'];
+    const keys = ['business_name', 'phone', 'email', 'city', 'base_location', 'legal', 'hours', 'open_slots', 'slot_step', 'rotation_min', 'travel_min', 'min_notice_hours', 'max_days_ahead', 'services', 'packs', 'club_plans', 'club_options', 'season_discount'];
     const o = {};
     keys.forEach((k) => (o[k] = s[k]));
     o.capacity = capacity;

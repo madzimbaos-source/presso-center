@@ -1719,6 +1719,13 @@
       '<div class="grid-2"><label class="field"><span>Téléphone WhatsApp</span><input name="phone" type="tel" value="' + esc(S.phone) + '"><small>Affiché aux clients pour te prévenir.</small></label><label class="field"><span>E-mail</span><input name="email" type="email" value="' + esc(S.email) + '"></label></div>' +
       '<label class="field"><span>Lieu affiché sur le site</span><input name="base_location" value="' + esc(S.base_location) + '"><small>Pour les séances où le client vient sur place. Reste vague : ville ou quartier.</small></label>' +
       '<label class="field"><span>Adresse d\'accueil des séances (privée)</span><input name="reception_address" value="' + esc(S.reception_address || '') + '" placeholder="Numéro, rue, commune, étage ou code d\'accès"><small>Jamais affichée sur le site. Envoyée au client dans l\'e-mail et le message de confirmation.</small></label></div></form>';
+    // Informations légales
+    const L = S.legal || {};
+    h += '<form class="card" id="set-legal" style="margin-bottom:16px"><div class="card-head"><h2>Informations légales</h2><button class="btn sm">Enregistrer</button></div><p class="small muted" style="margin-bottom:10px">Affichées sur la page « Mentions légales » du site. La loi les impose à tout professionnel.</p><div class="stack">' +
+      '<div class="grid-2"><label class="field"><span>Nom et prénom de l\'entrepreneur</span><input name="name" value="' + esc(L.name || '') + '" autocomplete="name"></label><label class="field"><span>Statut</span><input name="status" value="' + esc(L.status || '') + '"></label></div>' +
+      '<div class="grid-2"><label class="field"><span>SIRET</span><input name="siret" value="' + esc(L.siret || '') + '" inputmode="numeric" placeholder="14 chiffres"><small>Vide : « en cours d\'immatriculation ».</small></label><label class="field"><span>Médiateur de la consommation</span><input name="mediator" value="' + esc(L.mediator || '') + '" placeholder="Nom et site du médiateur"></label></div>' +
+      '<label class="field"><span>Adresse professionnelle</span><input name="address" value="' + esc(L.address || '') + '" placeholder="Numéro, rue, code postal, ville"><small>Publique. Une adresse de domiciliation est possible si tu ne veux pas afficher ton domicile.</small></label>' +
+      '<p class="small"><a href="mentions-legales.html" target="_blank" rel="noopener">Voir les mentions légales</a> · <a href="confidentialite.html" target="_blank" rel="noopener">Voir la politique de confidentialité</a></p></div></form>';
     // Horaires
     h += '<form class="card" id="set-hours" style="margin-bottom:16px"><div class="card-head"><h2>Disponibilités de chaque semaine</h2><button class="btn sm">Enregistrer</button></div><p class="small muted" style="margin-bottom:8px">Plages répétées toutes les semaines. Pour ouvrir une date précise, utilise le bouton « Disponibilité » de l\'agenda. Les créneaux déjà pris, les clubs et les événements sont retirés automatiquement.</p>';
     DAYS.forEach(([k, label]) => {
@@ -1774,6 +1781,10 @@
       });
     };
     on('set-contact', (fd, n) => ['business_name', 'owner_name', 'phone', 'email', 'base_location', 'reception_address'].forEach((k) => (n[k] = String(fd.get(k) || '').trim())));
+    on('set-legal', (fd, n) => {
+      n.legal = Object.assign({}, n.legal || {});
+      ['name', 'status', 'siret', 'address', 'mediator'].forEach((k) => (n.legal[k] = String(fd.get(k) || '').trim()));
+    });
     on('set-hours', (fd, n, f) => {
       const hours = {};
       $$('[data-day]', f).forEach((el) => {

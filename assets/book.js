@@ -169,6 +169,7 @@
         '<span class="small muted">Carte bancaire, espèces, Lydia ou Wero. Annulation gratuite en nous prévenant au moins 12 h avant.</span></div>';
       if (st.error) html += '<p class="form-error" role="alert">' + esc(st.error) + '</p>';
       html += '<button class="btn gold block" type="submit" style="min-height:50px;font-size:16px"' + (st.sending ? ' disabled' : '') + '>' + (st.sending ? 'Envoi…' : 'Envoyer ma demande') + '</button>';
+      html += '<p class="small muted" style="text-align:center">Tes informations servent uniquement à organiser ta séance. <a href="confidentialite.html">Politique de confidentialité</a></p>';
       html += '</form></section>';
     }
 
@@ -233,7 +234,8 @@
       '<label class="field"><span>Formule envisagée</span><select name="plan"><option value="">Je ne sais pas encore</option>' + (info.club_plans || []).map((p) => '<option value="' + esc(p.code) + '">' + esc(p.name) + ' · ' + PC.eur(p.price) + ' / mois</option>').join('') + '</select></label>' +
       '<label class="field"><span>Effectif, jours d\'entraînement, questions</span><textarea name="message" rows="3"></textarea></label>' +
       '<p class="form-error hide" id="club-error" role="alert"></p>' +
-      '<button class="btn" type="submit">Envoyer la demande</button></form></div>';
+      '<button class="btn" type="submit">Envoyer la demande</button>' +
+      '<p class="small muted">Vos informations servent uniquement à répondre à votre demande. <a href="confidentialite.html">Politique de confidentialité</a></p></form></div>';
     clubsRoot.innerHTML = html;
   }
 
