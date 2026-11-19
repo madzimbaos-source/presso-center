@@ -39,6 +39,30 @@ La base de production est déjà branchée (`assets/config.js`). Les étapes ci-
 
 Le bouton « Créer mon compte » de `gestion.html` fonctionne aussi, mais il dépend de l'e-mail de confirmation. Le service d'e-mail intégré de Supabase est très limité : pour s'en servir en production (confirmation, mot de passe oublié), brancher un SMTP dans **Authentication → Emails**.
 
+## E-mails (Resend)
+
+Tout le courrier du domaine passe par Resend.
+
+- **Réception** : un message envoyé à une adresse `@pressocenter.fr` (par exemple `contact@pressocenter.fr`) arrive chez Resend, qui prévient la fonction `mail`. Celle-ci le transfère vers la boîte du gérant, pièces jointes comprises, avec l'expéditeur d'origine en adresse de réponse.
+- **Notifications** : à chaque réservation en ligne, le gérant reçoit une alerte et le client un accusé de réception. Quand la demande passe à « confirmée », le client reçoit la confirmation. Une demande de test pilote déclenche aussi une alerte. Le client ne reçoit rien s'il n'a pas indiqué d'e-mail.
+
+Fonctionnement : les déclencheurs de `supabase/mail.sql` appellent la fonction Edge `supabase/functions/mail` (routes `/notify` et `/inbound`). L'appel est asynchrone : une erreur d'e-mail ne bloque jamais une réservation.
+
+Réglages, hors du dépôt :
+
+| Où | Nom | Rôle |
+|---|---|---|
+| Secrets de la fonction | `RESEND_API_KEY` | clé Resend (lecture des e-mails reçus et envoi) |
+| Secrets de la fonction | `RESEND_WEBHOOK_SECRET` | vérifie la signature des appels de Resend |
+| Secrets de la fonction | `HOOK_SECRET` | secret partagé avec la base |
+| Secrets de la fonction | `NOTIFY_TO` | boîte qui reçoit les alertes et les transferts |
+| Secrets de la fonction | `MAIL_FROM`, `SITE_URL` | expéditeur et adresse du site |
+| Supabase Vault | `presso_mail_url`, `presso_hook_secret` | adresse de la fonction et secret partagé |
+
+DNS : le domaine doit être vérifié chez Resend (DKIM, SPF sur `send`, MX de réception à la racine). Les lignes exactes sont dans Resend → Domains.
+
+Pour diagnostiquer : `select * from net._http_response order by id desc limit 5;` montre les dernières réponses de la fonction.
+
 ## Sécurité
 
 - Toutes les tables sont protégées par RLS. Seul un compte inscrit dans `admins` lit et écrit.
@@ -64,6 +88,8 @@ assets/
   vendor/           supabase-js 2.45.4 et qrcode-generator 1.4.4 (licence MIT)
 supabase/
   schema.sql        tables, RLS, fonctions
+  mail.sql          déclencheurs d'e-mails
+  functions/mail/   fonction Edge : notifications et transfert des e-mails reçus
   seed.sql          réglages et tarifs du plan, bottes, consommables, partenaires
 ```
 

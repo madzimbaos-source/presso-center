@@ -150,7 +150,7 @@
       html += '<form id="book-form" class="stack" novalidate>';
       html += '<div class="grid-2"><label class="field"><span>Prénom et nom</span><input name="name" autocomplete="name" required value="' + esc(me.name || '') + '"></label>' +
         '<label class="field"><span>Téléphone</span><input name="phone" type="tel" autocomplete="tel" inputmode="tel" required value="' + esc(me.phone || '') + '"></label></div>';
-      html += '<div class="grid-2"><label class="field"><span>E-mail <span class="muted">(facultatif)</span></span><input name="email" type="email" autocomplete="email" value="' + esc(me.email || '') + '"></label>' +
+      html += '<div class="grid-2"><label class="field"><span>E-mail <span class="muted">(pour recevoir la confirmation)</span></span><input name="email" type="email" autocomplete="email" value="' + esc(me.email || '') + '"></label>' +
         '<label class="field"><span>Ton sport</span><input name="sport" placeholder="Football, course, judo…" value="' + esc(me.sport || '') + '"></label></div>';
       if (st.svc.kind === 'domicile') {
         html += '<label class="field"><span>Adresse de la séance</span><input name="address" autocomplete="street-address" required placeholder="Numéro, rue, commune"></label>';
