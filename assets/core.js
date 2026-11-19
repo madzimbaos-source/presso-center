@@ -148,7 +148,8 @@
     transactions: ['id', 'date', 'type', 'category', 'label', 'amount', 'method', 'booking_id', 'partner_id', 'client_id', 'created_at'],
     equipment: ['id', 'name', 'kind', 'model', 'serial', 'size', 'purchase_date', 'purchase_price', 'status', 'last_check', 'notes', 'created_at'],
     stock: ['id', 'name', 'unit', 'qty', 'min_qty', 'per_passage', 'unit_cost', 'notes', 'created_at'],
-    checks: ['id', 'date', 'items', 'ok', 'notes', 'created_at']
+    checks: ['id', 'date', 'items', 'ok', 'notes', 'created_at'],
+    messages: ['id', 'direction', 'from_name', 'from_email', 'to_email', 'subject', 'body', 'attachments', 'reply_to_id', 'read', 'created_at']
   };
   PC.TABLES = Object.keys(PC.SCHEMA);
 
@@ -432,6 +433,9 @@
     tool: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94z"/>',
     menu: '<path d="M3 12h18M3 6h18M3 18h18"/>',
     search: '<circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>',
+    mail: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 6L2 7"/>',
+    send: '<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>',
+    refresh: '<path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>',
     wave: '<path d="M2 8c2.5-3 5-3 7.5 0s5 3 7.5 0 3.5-2.2 5-2.2"/><path d="M2 16c2.5-3 5-3 7.5 0s5 3 7.5 0 3.5-2.2 5-2.2"/>',
     star: '<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/>'
   };
@@ -602,7 +606,14 @@
       { id: PC.uid(), date: PC.ymd(PC.addDays(now, -15)), items: [], ok: true, notes: 'RAS', created_at: iso() }
     ];
 
-    return { settings: s, clients, partners, bookings, transactions, equipment, stock, checks };
+    const ago = (h) => new Date(now.getTime() - h * 3600000).toISOString();
+    const m1 = PC.uid();
+    const messages = [
+      { id: m1, direction: 'in', from_name: 'Julie Martin', from_email: 'julie.martin@example.com', to_email: 'contact@pressocenter.fr', subject: 'Séance pour notre équipe de handball', body: 'Bonjour,\n\nJe suis entraîneuse d\'une équipe de handball à Tours. Est-il possible d\'organiser une séance découverte pour 12 joueuses un jeudi soir après l\'entraînement ?\n\nMerci d\'avance,\nJulie', attachments: [], reply_to_id: null, read: false, created_at: ago(3) },
+      { id: PC.uid(), direction: 'in', from_name: 'Karim B.', from_email: 'karim.b@example.com', to_email: 'contact@pressocenter.fr', subject: 'Carte 10 séances', body: 'Bonjour, comment fait-on pour acheter une carte 10 séances ? Peut-on la partager à deux ?\n\nKarim', attachments: [], reply_to_id: null, read: true, created_at: ago(50) },
+      { id: PC.uid(), direction: 'out', from_name: 'Presso Center', from_email: 'contact@pressocenter.fr', to_email: 'karim.b@example.com', subject: 'Re: Carte 10 séances', body: 'Bonjour Karim,\n\nLa carte s\'achète lors d\'une séance, au prix de 170 €. Elle est nominative.\n\nÀ bientôt,\nPresso Center', attachments: [], reply_to_id: null, read: true, created_at: ago(47) }
+    ];
+    return { settings: s, clients, partners, bookings, transactions, equipment, stock, checks, messages };
   };
 
   /* ------------------------------------------------------------------
@@ -699,6 +710,16 @@
         d.partners.push({ id: PC.uid(), name: String(p.name).trim(), kind: p.kind || 'club', sport: p.sport || '', contact_name: p.contact_name || '', phone: PC.cleanPhone(p.phone), email: p.email || '', location: '', status: 'demande', plan: p.plan || null, monthly_price: null, season_commitment: false, pilot_start: null, pilot_end: null, slot_info: '', notes: p.message || 'Demande de test pilote depuis le site.', created_at: new Date().toISOString() });
         save();
         return { ok: true };
+      },
+      async list(table) {
+        return JSON.parse(JSON.stringify(load()[table] || []));
+      },
+      async sendMail(p) {
+        const d = load();
+        const row = { id: p.id || PC.uid(), direction: 'out', from_name: 'Presso Center', from_email: 'contact@pressocenter.fr', to_email: p.to, subject: p.subject, body: p.body, attachments: [], reply_to_id: p.reply_to_id || null, read: true, created_at: new Date().toISOString() };
+        (d.messages = d.messages || []).push(row);
+        save();
+        return JSON.parse(JSON.stringify(row));
       },
       async exportAll() {
         return JSON.parse(JSON.stringify(load()));
@@ -818,6 +839,23 @@
         const { data, error } = await sb.rpc('club_request', { p });
         fail(error);
         return data;
+      },
+      async list(table) {
+        return fetchAll(table);
+      },
+      // Envoi au nom de contact@ : passe par la fonction « mail », qui vérifie le compte gérant
+      async sendMail(p) {
+        const { data } = await sb.auth.getSession();
+        const token = data.session && data.session.access_token;
+        if (!token) throw new Error('Session expirée, reconnecte-toi.');
+        const res = await fetch(cfg.supabaseUrl + '/functions/v1/mail/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+          body: JSON.stringify(Object.assign({ id: PC.uid() }, p))
+        });
+        const out = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(out.error || 'Envoi impossible (' + res.status + ').');
+        return out.message;
       },
       async exportAll() {
         const all = await this.loadAll();

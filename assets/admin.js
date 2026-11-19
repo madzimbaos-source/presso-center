@@ -17,6 +17,7 @@
     day: PC.startOfDay(new Date()),
     month: PC.monthKey(new Date()),
     clientsTab: 'particuliers',
+    msgTab: 'in',
     search: '',
     txFilter: 'tout',
     showTable: false,
@@ -28,6 +29,7 @@
     accueil: { label: 'Accueil', icon: 'home', render: viewHome },
     agenda: { label: 'Agenda', icon: 'calendar', render: viewAgenda },
     clients: { label: 'Clients', icon: 'users', render: viewClients },
+    messages: { label: 'Messages', icon: 'mail', render: viewMessages },
     finances: { label: 'Finances', icon: 'euro', render: viewFinances },
     materiel: { label: 'Matériel', icon: 'box', render: viewMateriel },
     reglages: { label: 'Réglages', icon: 'sliders', render: viewReglages }
@@ -171,7 +173,7 @@
       Object.keys(VIEWS).map((k) => nav(k, VIEWS[k])).join('') +
       '<div class="spacer"></div><a class="nav-btn" href="reserver.html" target="_blank" rel="noopener">' + I('external') + '<span>Page de réservation</span></a>' +
       (store.mode === 'supabase' ? '<button class="nav-btn" data-act="logout">' + I('logout') + '<span>Se déconnecter</span></button><div class="who">' + esc(UI.user ? UI.user.email : '') + '</div>' : '') +
-      '</aside><div class="content"><header class="topbar"><span class="brand" style="padding:0">Presso Center</span><span class="row"><a class="btn icon" href="reserver.html" target="_blank" rel="noopener" aria-label="Page de réservation">' + I('external') + '</a><button class="btn icon" data-nav="reglages" aria-label="Réglages">' + I('sliders') + '</button></span></header>' +
+      '</aside><div class="content"><header class="topbar"><span class="brand" style="padding:0">Presso Center</span><span class="row"><button class="btn icon" data-nav="messages" aria-label="Messages" style="position:relative">' + I('mail') + '<span class="count hide" data-count="messages"></span></button><a class="btn icon" href="reserver.html" target="_blank" rel="noopener" aria-label="Page de réservation">' + I('external') + '</a><button class="btn icon" data-nav="reglages" aria-label="Réglages">' + I('sliders') + '</button></span></header>' +
       '<main class="main" id="view"></main></div>' +
       '<nav class="tabbar" aria-label="Navigation">' + ['accueil', 'agenda', 'clients', 'finances', 'materiel'].map(tab).join('') + '</nav></div>' +
       '<dialog class="modal" id="modal"></dialog>';
@@ -184,6 +186,7 @@
     UI.view = VIEWS[h] ? h : 'accueil';
     render();
     window.scrollTo(0, 0);
+    if (UI.view === 'messages') refreshMessages();
   }
   function go(view) {
     if (location.hash === '#' + view) render();
@@ -196,7 +199,7 @@
     if (!v) return;
     v.innerHTML = VIEWS[UI.view].render();
     $$('[data-nav]').forEach((b) => b.setAttribute('aria-current', b.dataset.nav === UI.view ? 'page' : 'false'));
-    const counts = { agenda: D.bookings.filter((b) => b.status === 'demande').length, clients: D.partners.filter((p) => p.status === 'demande').length };
+    const counts = { agenda: D.bookings.filter((b) => b.status === 'demande').length, clients: D.partners.filter((p) => p.status === 'demande').length, messages: unreadCount() };
     $$('[data-count]').forEach((el) => {
       const n = counts[el.dataset.count] || 0;
       el.textContent = n;
@@ -379,6 +382,8 @@
     const mk = PC.monthKey(now);
     const dem = D.bookings.filter((b) => b.status === 'demande');
     if (dem.length) out.push({ cls: 'warn', icon: 'clock', html: '<b>' + dem.length + ' demande' + (dem.length > 1 ? 's' : '') + ' à confirmer</b> sur l\'agenda', act: 'nav', arg: 'agenda', btn: 'Voir' });
+    const unread = unreadCount();
+    if (unread) out.push({ cls: 'info', icon: 'mail', html: '<b>' + unread + ' message' + (unread > 1 ? 's' : '') + ' non lu' + (unread > 1 ? 's' : '') + '</b> dans la messagerie', act: 'nav', arg: 'messages', btn: 'Lire' });
     const toClose = D.bookings.filter((b) => b.status === 'confirmee' && b.kind !== 'indispo' && bEnd(b) < now);
     if (toClose.length) out.push({ cls: 'info', icon: 'check', html: '<b>' + toClose.length + ' séance' + (toClose.length > 1 ? 's' : '') + ' passée' + (toClose.length > 1 ? 's' : '') + '</b> à clôturer (passages, paiement)', act: 'open-booking', arg: toClose[0].id, btn: 'Clôturer' });
     const unpaid = D.bookings.filter((b) => b.status === 'terminee' && !b.paid && Number(b.price) > 0 && b.payment_mode !== 'credit' && b.payment_mode !== 'forfait');
@@ -941,6 +946,7 @@
       const phone = c.phone;
       body += '<div class="row wrap" style="margin-top:14px">' + (S.packs || []).map((p) => '<button class="btn sm soft" data-act="sell-pack" data-id="' + c.id + '" data-pack="' + p.code + '">' + I('plus') + 'Vendre : ' + esc(p.name) + ' · ' + PC.eur(p.price) + '</button>').join('') +
         '<button class="btn sm soft" data-act="new-booking-for" data-id="' + c.id + '">' + I('calendar') + 'Nouvelle séance</button>' +
+        (c.email ? '<button class="btn sm ghost" data-act="write-client" data-to="' + esc(c.email) + '">' + I('mail') + 'E-mail</button>' : '') +
         (phone ? '<a class="btn sm ghost" target="_blank" rel="noopener" href="' + esc(PC.waLink(phone, '')) + '">' + I('message') + 'WhatsApp</a><a class="btn sm ghost" href="tel:' + esc(PC.cleanPhone(phone)) + '">' + I('phone') + 'Appeler</a>' : '') + '</div>';
       const hist = D.bookings.filter((b) => b.client_id === c.id).sort((a, b) => bStart(b) - bStart(a)).slice(0, 12);
       body += '<h3 style="font-size:15px;margin:20px 0 6px">Historique</h3>' + (hist.length ? '<div class="list">' + hist.map((b) => '<div class="li click" data-act="open-booking" data-id="' + b.id + '"><span class="grow"><span class="t">' + esc(PC.capitalize(PC.fmtDay(bStart(b), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }))) + ' · ' + PC.fmtTime(bStart(b)) + '</span><br><span class="s">' + esc(bSub(b)) + ' · ' + PC.eur(b.price) + '</span></span>' + statusBadge(b) + '</div>').join('') + '</div>' : '<p class="muted small">Aucune séance.</p>');
@@ -1102,6 +1108,106 @@
       '<p class="f">' + esc(S.business_name) + (S.phone ? ' · ' + esc(S.phone) : '') + (S.email ? ' · ' + esc(S.email) : '') + ' · Récupération et bien-être sportif, sans visée médicale.</p>' +
       '<script>window.onload=function(){window.print()}<\/script></body></html>');
     w.document.close();
+  }
+
+  /* =================================================================
+     Vue : Messages (e-mails reçus sur contact@ et réponses)
+     Le contenu reçu est affiché en texte seul, toujours échappé.
+     ================================================================= */
+  const CONTACT_EMAIL = 'contact@pressocenter.fr';
+  function unreadCount() {
+    return (D.messages || []).filter((m) => m.direction === 'in' && !m.read).length;
+  }
+  async function refreshMessages(manual) {
+    try {
+      D.messages = await store.list('messages');
+      if (UI.view === 'messages') render();
+      if (manual) PC.toast('Messagerie à jour');
+    } catch (e) {
+      if (manual) PC.toast(e.message, 'bad');
+    }
+  }
+  function msgWhen(iso) {
+    const d = new Date(iso);
+    const sameDay = PC.ymd(d) === PC.ymd(new Date());
+    return sameDay ? PC.fmtTime(d) : PC.fmtDay(d, { day: 'numeric', month: 'short' });
+  }
+  function viewMessages() {
+    const tab = UI.msgTab;
+    const all = (D.messages || []).slice().sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    const list = all.filter((m) => m.direction === tab);
+    const unread = unreadCount();
+    let h = '<div class="page-head"><div><h1>Messages</h1><p>' + CONTACT_EMAIL + ' · ' + (unread ? unread + ' non lu' + (unread > 1 ? 's' : '') : 'tout est lu') + '</p></div><button class="btn" data-act="new-message">' + I('plus') + 'Nouveau message</button></div>';
+    h += '<div class="toolbar"><div class="seg" role="group"><button data-act="msg-tab" data-id="in" aria-pressed="' + (tab === 'in') + '">Reçus</button><button data-act="msg-tab" data-id="out" aria-pressed="' + (tab === 'out') + '">Envoyés</button></div><span class="grow"></span><button class="btn sm ghost" data-act="refresh-messages">' + I('refresh') + 'Actualiser</button></div>';
+    if (!list.length) return h + '<div class="empty">' + (tab === 'in' ? 'Aucun message reçu pour le moment. Les e-mails envoyés à ' + CONTACT_EMAIL + ' apparaîtront ici.' : 'Aucun message envoyé.') + '</div>';
+    h += '<div class="card flat" style="padding:4px 10px"><div class="list">' + list.map((m) => {
+      const who = tab === 'in' ? (m.from_name || m.from_email || 'Inconnu') : 'À : ' + (m.to_email || '');
+      const fresh = tab === 'in' && !m.read;
+      const snippet = String(m.body || '').replace(/\s+/g, ' ').slice(0, 110);
+      return '<div class="li click msg' + (fresh ? ' unread' : '') + '" data-act="open-message" data-id="' + m.id + '" role="button" tabindex="0">' +
+        '<span class="msg-dot" aria-hidden="true"></span>' +
+        '<span class="grow"><span class="row between"><span class="t">' + esc(who) + (fresh ? ' <span class="sr-only">(non lu)</span>' : '') + '</span><span class="s tnum">' + esc(msgWhen(m.created_at)) + '</span></span>' +
+        '<span class="msg-subject">' + esc(m.subject || '(sans objet)') + '</span>' +
+        '<span class="s msg-snippet">' + esc(snippet) + '</span></span></div>';
+    }).join('') + '</div></div>';
+    return h;
+  }
+
+  function openMessage(id) {
+    const m = (D.messages || []).find((x) => x.id === id);
+    if (!m) return;
+    const incoming = m.direction === 'in';
+    const atts = Array.isArray(m.attachments) ? m.attachments : [];
+    let body = '<p class="small muted">' + (incoming ? 'De <b style="color:var(--ink)">' + esc(m.from_name ? m.from_name + ' <' + m.from_email + '>' : m.from_email || '') + '</b>' : 'À <b style="color:var(--ink)">' + esc(m.to_email || '') + '</b>') +
+      ' · ' + esc(PC.capitalize(PC.fmtDay(new Date(m.created_at), { weekday: 'long', day: 'numeric', month: 'long' }))) + ' à ' + PC.fmtTime(new Date(m.created_at)) + '</p>' +
+      '<div class="msg-body">' + esc(m.body || '') + '</div>';
+    if (atts.length) body += '<div class="alert" style="margin-top:12px">' + I('info') + '<span>Pièces jointes (' + atts.length + ') : ' + esc(atts.map((a) => a.filename).join(', ')) + '. Elles sont dans la copie reçue sur Gmail.</span></div>';
+    if (incoming) {
+      body += '<form id="reply-form" class="stack" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--line)"><label class="field"><span>Répondre à ' + esc(m.from_email || '') + '</span><textarea name="body" rows="6" required placeholder="Ta réponse…"></textarea><small>Envoyé au nom de ' + CONTACT_EMAIL + '. La réponse du client reviendra ici.</small></label><p class="form-error hide" id="reply-error" role="alert"></p></form>';
+    }
+    modal({ title: m.subject || '(sans objet)', body, wide: true, foot: '<button class="btn danger" data-act="delete-message" data-id="' + m.id + '">Supprimer</button><button class="btn ghost" data-close>Fermer</button>' + (incoming ? '<button class="btn" type="submit" form="reply-form">' + I('send') + 'Envoyer</button>' : '') });
+    if (incoming && !m.read) run(() => patch('messages', m.id, { read: true }));
+    const form = $('#reply-form');
+    if (form) form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const subject = /^re\s*:/i.test(m.subject || '') ? m.subject : 'Re: ' + (m.subject || '');
+      sendMessage({ to: m.from_email, subject, body: String(new FormData(form).get('body') || '').trim(), reply_to_id: m.id }, form, $('#reply-error'));
+    });
+  }
+
+  function composeMessage(defaults) {
+    const d = Object.assign({ to: '', subject: '', body: '' }, defaults || {});
+    const body = '<form id="compose-form" class="stack"><label class="field"><span>Destinataire</span><input type="email" name="to" required value="' + esc(d.to) + '" placeholder="prenom@exemple.fr"></label>' +
+      '<label class="field"><span>Objet</span><input name="subject" required maxlength="300" value="' + esc(d.subject) + '"></label>' +
+      '<label class="field"><span>Message</span><textarea name="body" rows="8" required>' + esc(d.body) + '</textarea><small>Envoyé au nom de ' + CONTACT_EMAIL + '.</small></label><p class="form-error hide" id="compose-error" role="alert"></p></form>';
+    modal({ title: 'Nouveau message', body, wide: true, foot: '<button class="btn ghost" data-close>Annuler</button><button class="btn" type="submit" form="compose-form">' + I('send') + 'Envoyer</button>' });
+    const form = $('#compose-form');
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const f = new FormData(form);
+      sendMessage({ to: String(f.get('to') || '').trim(), subject: String(f.get('subject') || '').trim(), body: String(f.get('body') || '').trim() }, form, $('#compose-error'));
+    });
+  }
+
+  async function sendMessage(p, form, errEl) {
+    if (!p.to || !p.subject || !p.body) return;
+    const btn = document.querySelector('.modal-foot button[type=submit]');
+    if (btn) btn.disabled = true;
+    errEl.classList.add('hide');
+    try {
+      const row = await store.sendMail(Object.assign({ id: PC.uid() }, p));
+      if (row) {
+        D.messages = (D.messages || []).filter((x) => x.id !== row.id);
+        D.messages.push(row);
+      }
+      closeModal();
+      PC.toast('Message envoyé');
+      render();
+    } catch (e) {
+      errEl.textContent = e.message || 'Envoi impossible.';
+      errEl.classList.remove('hide');
+      if (btn) btn.disabled = false;
+    }
   }
 
   /* =================================================================
@@ -1709,6 +1815,20 @@
         }, 'Client supprimé');
       }
       case 'sell-pack': return sellPack(id, el.dataset.pack);
+      case 'msg-tab':
+        UI.msgTab = id;
+        return render();
+      case 'refresh-messages': return refreshMessages(true);
+      case 'open-message': return openMessage(id);
+      case 'new-message': return composeMessage();
+      case 'write-client': return composeMessage({ to: el.dataset.to || '' });
+      case 'delete-message': {
+        if (!window.confirm('Supprimer ce message de la messagerie ?')) return;
+        return run(async () => {
+          await remove('messages', id);
+          closeModal();
+        }, 'Message supprimé');
+      }
       case 'new-partner': return openPartner(null);
       case 'open-partner': return openPartner(id);
       case 'delete-partner': {

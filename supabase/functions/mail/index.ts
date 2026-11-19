@@ -1,7 +1,10 @@
 // Presso Center — e-mails via Resend (fonction Edge Supabase « mail »)
 //
-//   POST /mail/inbound   webhook Resend « email.received » : transfère chaque message
-//                        reçu sur @pressocenter.fr vers l'adresse NOTIFY_TO.
+//   POST /mail/inbound   webhook Resend « email.received » : enregistre chaque message
+//                        reçu sur @pressocenter.fr dans la table messages (messagerie
+//                        de l'espace de gestion) et en envoie une copie à NOTIFY_TO.
+//   POST /mail/send      envoi d'un message depuis l'espace de gestion, au nom de
+//                        contact@pressocenter.fr. Réservé au compte gérant.
 //   POST /mail/notify    appelé par les déclencheurs de la base (voir supabase/mail.sql) :
 //                        nouvelle réservation, réservation confirmée, demande de club.
 //
@@ -18,8 +21,52 @@ const MAX_ATTACHMENTS_BYTES = 15 * 1024 * 1024;
 const esc = (v: unknown) =>
   String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
 
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+const json = (body: unknown, status = 200, extra: Record<string, string> = {}) =>
+  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...extra } });
+
+// Seul le site peut appeler /send depuis un navigateur
+function cors(req: Request): Record<string, string> {
+  const origin = req.headers.get('origin') ?? '';
+  const allowed = [SITE(), SITE().replace('://', '://www.')];
+  return {
+    'Access-Control-Allow-Origin': allowed.includes(origin) ? origin : SITE(),
+    'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-client-info',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    Vary: 'Origin',
+  };
+}
+
+// ---------------------------------------------------------------- Base (clé de service, côté serveur uniquement)
+async function db(path: string, opts: { method?: string; body?: unknown; prefer?: string } = {}) {
+  const key = env('SUPABASE_SERVICE_ROLE_KEY');
+  const res = await fetch(`${env('SUPABASE_URL')}/rest/v1${path}`, {
+    method: opts.method ?? 'GET',
+    headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', ...(opts.prefer ? { Prefer: opts.prefer } : {}) },
+    body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Base ${res.status} sur ${path} : ${text.slice(0, 300)}`);
+  return text ? JSON.parse(text) : null;
+}
+
+async function isAdmin(authorization: string) {
+  if (!/^Bearer\s+\S+/i.test(authorization)) return false;
+  const res = await fetch(`${env('SUPABASE_URL')}/auth/v1/user`, {
+    headers: { apikey: env('SUPABASE_SERVICE_ROLE_KEY'), Authorization: authorization },
+  });
+  if (!res.ok) return false;
+  const user = await res.json();
+  if (!user?.id) return false;
+  const rows = await db(`/admins?user_id=eq.${encodeURIComponent(user.id)}&select=user_id`);
+  return Array.isArray(rows) && rows.length === 1;
+}
+
+const htmlToText = (h: string) =>
+  h.replace(/<(style|script)[\s\S]*?<\/\1>/gi, '')
+    .replace(/<br\s*\/?>|<\/(p|div|tr|li|h\d)>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
+    .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
 
 // ---------------------------------------------------------------- Resend
 async function resend(path: string, opts: { method?: string; body?: unknown; idempotencyKey?: string } = {}) {
@@ -223,6 +270,23 @@ async function forwardInbound(emailId: string) {
   const replyTo = Array.isArray(mail.reply_to) && mail.reply_to.length ? mail.reply_to : [sender.email];
   const to = (Array.isArray(mail.to) ? mail.to : [mail.to]).filter(Boolean).join(', ');
 
+  // Messagerie de l'espace de gestion : texte seul, jamais de HTML reçu de l'extérieur
+  await db('/messages?on_conflict=resend_id', {
+    method: 'POST',
+    prefer: 'resolution=ignore-duplicates,return=minimal',
+    body: {
+      direction: 'in',
+      from_name: sender.name.slice(0, 200) || null,
+      from_email: String(replyTo[0] || sender.email).slice(0, 320),
+      to_email: to.slice(0, 500),
+      subject: String(mail.subject || '(sans objet)').slice(0, 500),
+      body: String(mail.text || (mail.html ? htmlToText(String(mail.html)) : '')).slice(0, 100000),
+      attachments: (Array.isArray(mail.attachments) ? mail.attachments : []).map((a: any) => ({ filename: String(a.filename || 'pièce jointe').slice(0, 200), size: Number(a.size) || 0 })),
+      resend_id: emailId,
+      message_id: mail.message_id ? String(mail.message_id).slice(0, 500) : null,
+    },
+  });
+
   // Pièces jointes, dans la limite de taille acceptée
   const attachments: { filename: string; content: string }[] = [];
   const skipped: string[] = [];
@@ -264,12 +328,65 @@ async function forwardInbound(emailId: string) {
   return 'transféré';
 }
 
+// ---------------------------------------------------------------- Envoi depuis l'espace de gestion
+const EMAIL_RE = /^[^\s@<>",;]+@[^\s@<>",;]+\.[^\s@<>",;]{2,}$/;
+
+async function sendFromApp(p: Record<string, any>) {
+  const to = String(p.to ?? '').trim();
+  const subject = String(p.subject ?? '').trim();
+  const body = String(p.body ?? '').trim();
+  const id = String(p.id ?? '');
+  if (!EMAIL_RE.test(to) || to.length > 320) throw new Error('Adresse du destinataire invalide.');
+  if (!subject || subject.length > 300) throw new Error("L'objet est obligatoire (300 caractères maximum).");
+  if (!body || body.length > 20000) throw new Error('Le message est vide ou trop long.');
+  if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error('Identifiant du message manquant.');
+
+  let replyToId: string | null = null;
+  const headers: Record<string, string> = {};
+  if (p.reply_to_id && /^[0-9a-f-]{36}$/i.test(String(p.reply_to_id))) {
+    const rows = await db(`/messages?id=eq.${p.reply_to_id}&select=id,message_id`);
+    if (rows?.[0]) {
+      replyToId = rows[0].id;
+      if (rows[0].message_id) {
+        headers['In-Reply-To'] = rows[0].message_id;
+        headers['References'] = rows[0].message_id;
+      }
+    }
+  }
+
+  const html = `<div style="font:15px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#0f1623">${esc(body).replace(/\n/g, '<br>')}</div>` +
+    `<p style="margin-top:24px;padding-top:12px;border-top:1px solid #e2ddd2;font:13px/1.5 -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#626977"><b style="color:#0f1623">Presso Center</b><br>Récupération sportive mobile · Tours<br><a href="${esc(SITE())}" style="color:#626977">${esc(SITE().replace(/^https?:\/\//, ''))}</a></p>`;
+  const sent = await sendEmail({
+    from: FROM(), to: [to], reply_to: FROM_ADDRESS(), subject,
+    text: `${body}\n\n--\nPresso Center · ${SITE()}`, html,
+    ...(Object.keys(headers).length ? { headers } : {}),
+  }, `app-send/${id}`);
+
+  const rows = await db('/messages?on_conflict=id', {
+    method: 'POST',
+    prefer: 'resolution=merge-duplicates,return=representation',
+    body: { id, direction: 'out', from_name: 'Presso Center', from_email: FROM_ADDRESS(), to_email: to, subject, body, resend_id: sent?.id ?? null, reply_to_id: replyToId, read: true },
+  });
+  return rows?.[0] ?? null;
+}
+
 // ---------------------------------------------------------------- Entrée
 Deno.serve(async (req) => {
   const path = new URL(req.url).pathname.replace(/\/+$/, '');
+  if (path.endsWith('/send') && req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(req) });
   if (req.method !== 'POST') return json({ error: 'Méthode non autorisée' }, 405);
 
   try {
+    if (path.endsWith('/send')) {
+      if (!(await isAdmin(req.headers.get('authorization') ?? ''))) return json({ error: 'Non autorisé' }, 401, cors(req));
+      try {
+        return json({ ok: true, message: await sendFromApp(await req.json()) }, 200, cors(req));
+      } catch (e) {
+        console.error(e);
+        return json({ error: e instanceof Error ? e.message : String(e) }, 400, cors(req));
+      }
+    }
+
     if (path.endsWith('/notify')) {
       const secret = env('HOOK_SECRET');
       if (!secret || !safeEqual(req.headers.get('x-hook-secret') ?? '', secret)) return json({ error: 'Non autorisé' }, 401);

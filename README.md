@@ -8,6 +8,7 @@ Application web de Presso Center, l'activité de récupération sportive mobile 
   - **Accueil** : chiffre d'affaires comparé au prévisionnel, heures de la semaine sur le plafond de 16 h, liste « À faire » (demandes, séances à clôturer, paiements, stock, contrôle du matériel, mensualité Adie, seuil de TVA).
   - **Agenda** : semaine sur ordinateur, jour par jour sur téléphone ; séances, domicile, créneaux clubs, événements, indisponibilités ; confirmation et rappel par WhatsApp ; clôture d'une séance (passages, paiement, carte 10 séances).
   - **Clients** : fiches des sportifs (crédits, historique, santé) et suivi des clubs et partenaires, de la demande au contrat. Facturation du forfait mensuel et bilan de fréquentation imprimable pour le renouvellement.
+  - **Messages** : les e-mails reçus sur `contact@pressocenter.fr`, avec réponse et nouveau message envoyés au nom de cette adresse.
   - **Finances** : recettes et dépenses, « il me reste » (cotisations 16 %, charges, prêt), trésorerie et provision URSSAF, graphique comparé au prévisionnel, prêt Adie, seuil de franchise de TVA, export du livre des recettes (CSV).
   - **Matériel** : état des 5 bottes, contrôle hebdomadaire, consommables décomptés à chaque séance, rappel de la 6e botte.
   - **Réglages** : coordonnées, plages ouvertes à la réservation, tarifs, paramètres financiers, QR code pour les flyers, sauvegarde.
@@ -43,10 +44,11 @@ Le bouton « Créer mon compte » de `gestion.html` fonctionne aussi, mais il d�
 
 Tout le courrier du domaine passe par Resend.
 
-- **Réception** : un message envoyé à une adresse `@pressocenter.fr` (par exemple `contact@pressocenter.fr`) arrive chez Resend, qui prévient la fonction `mail`. Celle-ci le transfère vers la boîte du gérant, pièces jointes comprises, avec l'expéditeur d'origine en adresse de réponse.
+- **Réception** : un message envoyé à une adresse `@pressocenter.fr` (par exemple `contact@pressocenter.fr`) arrive chez Resend, qui prévient la fonction `mail`. Celle-ci l'enregistre dans la table `messages` (écran Messages de l'espace de gestion, en texte seul) et en envoie une copie à la boîte du gérant, pièces jointes comprises.
+- **Envoi depuis l'application** : une réponse ou un nouveau message part au nom de `contact@pressocenter.fr` par la route `/send` de la fonction, qui vérifie que l'appel vient du compte gérant.
 - **Notifications** : à chaque réservation en ligne, le gérant reçoit une alerte et le client un accusé de réception. Quand la demande passe à « confirmée », le client reçoit la confirmation. Une demande de test pilote déclenche aussi une alerte. Le client ne reçoit rien s'il n'a pas indiqué d'e-mail.
 
-Fonctionnement : les déclencheurs de `supabase/mail.sql` appellent la fonction Edge `supabase/functions/mail` (routes `/notify` et `/inbound`). L'appel est asynchrone : une erreur d'e-mail ne bloque jamais une réservation.
+Fonctionnement : les déclencheurs de `supabase/mail.sql` appellent la fonction Edge `supabase/functions/mail` (routes `/notify`, `/inbound` et `/send`). La table de la messagerie est créée par `supabase/messages.sql`. L'appel est asynchrone : une erreur d'e-mail ne bloque jamais une réservation.
 
 Réglages, hors du dépôt :
 
@@ -89,6 +91,7 @@ assets/
 supabase/
   schema.sql        tables, RLS, fonctions
   mail.sql          déclencheurs d'e-mails
+  messages.sql      table de la messagerie
   functions/mail/   fonction Edge : notifications et transfert des e-mails reçus
   seed.sql          réglages et tarifs du plan, bottes, consommables, partenaires
 ```
