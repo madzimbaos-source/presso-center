@@ -503,7 +503,7 @@
     const startKey = PC.addMonths(PC.monthKey(now), -3);
     const startDate = PC.parseYmd(startKey + '-01');
     const iso = () => new Date(startDate.getTime() - 86400000 * 3).toISOString();
-    const s = PC.mergeSettings({ start_month: startKey, phone: '06 00 00 00 00', email: 'contact@presso-center.fr' });
+    const s = PC.mergeSettings({ start_month: startKey, phone: '06 00 00 00 00', email: 'contact@pressocenter.fr' });
 
     const equipment = [];
     for (let i = 1; i <= 5; i++) {
