@@ -1704,7 +1704,7 @@
   }
   function pushHint() {
     if (!pushHintNeeded()) return '';
-    return '<div class="alert info" id="push-hint">' + I('bell') + '<span class="grow"><b>Notifications</b> : ' + (PUSH.supported ? 'sois prévenu des demandes et des messages sur cet appareil.' : 'ajoute l\'application à l\'écran d\'accueil pour être prévenu des demandes.') + '</span><button class="btn sm soft" data-nav="reglages">' + (PUSH.supported ? 'Activer' : 'Voir comment') + '</button><button class="btn sm ghost" data-act="push-hint-off">Plus tard</button></div>';
+    return '<div class="alert info" id="push-hint">' + I('bell') + '<span class="grow"><b>Notifications</b> : ' + (PUSH.supported ? 'sois prévenu des demandes et des messages sur cet appareil.' : 'ajoute l\'application à l\'écran d\'accueil pour être prévenu des demandes.') + '</span><button class="btn sm soft" data-act="push-go">' + (PUSH.supported ? 'Activer' : 'Voir comment') + '</button><button class="btn sm ghost" data-act="push-hint-off">Plus tard</button></div>';
   }
   function pushCard() {
     const head = '<div class="card" id="push-card" style="margin-bottom:16px"><div class="card-head"><h2>Notifications</h2>' + (PUSH.sub ? '<span class="badge good">Activées</span>' : '') + '</div><div class="stack">';
@@ -2456,6 +2456,15 @@
         const sub = (D.subscribers || []).find((x) => x.id === id);
         if (!sub || !window.confirm('Retirer ' + sub.email + ' de la liste ?')) return undefined;
         return run(() => remove('subscribers', id), 'Abonné retiré');
+      }
+      case 'push-go': {
+        // ouvre les réglages directement sur la carte Notifications
+        go('reglages');
+        setTimeout(() => {
+          const card = $('#push-card');
+          if (card) card.scrollIntoView({ block: 'center' });
+        }, 80);
+        return undefined;
       }
       case 'push-enable': return pushEnable();
       case 'push-disable': return pushDisable();
