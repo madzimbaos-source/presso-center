@@ -635,6 +635,7 @@
     const c = clientById(b.client_id);
     const p = partnerById(b.partner_id);
     const phone = b.client_phone || (c && c.phone) || (p && p.phone);
+    const mailTo = b.kind === 'indispo' ? '' : b.client_email || (c && c.email) || (p && p.email) || '';
     const row = (k, v) => (v ? '<tr><td class="muted" style="width:38%">' + k + '</td><td>' + v + '</td></tr>' : '');
     let body = '<div class="row wrap" style="margin-bottom:12px">' + statusBadge(b) + '<span class="badge plain k-' + b.kind + '" style="background:color-mix(in srgb, var(--k) 16%, var(--surface))">' + esc(PC.KINDS[b.kind].label) + '</span>' + (b.source === 'en_ligne' ? '<span class="badge plain">Réservé en ligne</span>' : '') + '</div>';
     body += '<table class="tbl"><tbody>' +
@@ -643,6 +644,7 @@
       row('Client', b.client_name ? (c ? '<button class="btn sm soft" data-act="open-client" data-id="' + c.id + '">' + esc(b.client_name) + '</button>' : esc(b.client_name)) : '') +
       row('Partenaire', p ? '<button class="btn sm soft" data-act="open-partner" data-id="' + p.id + '">' + esc(p.name) + '</button>' : '') +
       row('Téléphone', phone ? esc(phone) : '') +
+      row('E-mail', esc(mailTo || '')) +
       row('Adresse', esc(b.address || '')) +
       row('Lieu', esc(b.location || '')) +
       row('Bottes', b.kind !== 'indispo' ? String(b.boots || 0) + (b.passages ? ' · ' + b.passages + ' passage' + (b.passages > 1 ? 's' : '') : '') : '') +
@@ -657,6 +659,10 @@
         (b.status === 'demande' ? '<a class="btn sm soft" target="_blank" rel="noopener" href="' + esc(PC.waLink(phone, waMessage(b, 'confirm'))) + '">' + I('message') + 'Message de confirmation</a><a class="btn sm ghost" target="_blank" rel="noopener" href="' + esc(PC.waLink(phone, waMessage(b, 'refuse'))) + '">Proposer un autre créneau</a>' : '') +
         (b.status === 'confirmee' ? '<a class="btn sm soft" target="_blank" rel="noopener" href="' + esc(PC.waLink(phone, waMessage(b, 'remind'))) + '">' + I('message') + 'Envoyer un rappel</a>' : '') +
         '<a class="btn sm ghost" href="tel:' + esc(PC.cleanPhone(phone)) + '">' + I('phone') + 'Appeler</a></div>';
+    }
+    if (mailTo) {
+      body += '<div class="row wrap" style="margin-top:8px"><button class="btn sm soft" data-act="email-booking" data-id="' + b.id + '">' + I('mail') + 'Répondre par e-mail</button>' +
+        (b.status === 'demande' ? '<button class="btn sm ghost" data-act="email-booking" data-id="' + b.id + '" data-tpl="refuse">Proposer un autre créneau par e-mail</button>' : '') + '</div>';
     }
     const A = (act, label, cls) => '<button class="btn ' + (cls || 'ghost') + '" data-act="' + act + '" data-id="' + b.id + '">' + label + '</button>';
     let foot = '';
@@ -1037,6 +1043,7 @@
         '<button class="btn sm soft" data-act="new-club-slot" data-id="' + p.id + '">' + I('calendar') + 'Planifier un créneau</button>' +
         '<button class="btn sm soft" data-act="report-partner" data-id="' + p.id + '">' + I('printer') + 'Bilan de fréquentation</button>' +
         (Number(p.monthly_price) > 0 ? '<button class="btn sm soft" data-act="bill-partner" data-id="' + p.id + '"' + (partnerBilled(p, mk) ? ' disabled' : '') + '>' + I('euro') + (partnerBilled(p, mk) ? 'Forfait de ' + PC.fmtMonth(mk, true) + ' facturé' : 'Facturer ' + PC.fmtMonth(mk).toLowerCase()) + '</button>' : '') +
+        (p.email ? '<button class="btn sm soft" data-act="email-partner" data-id="' + p.id + '">' + I('mail') + 'Répondre par e-mail</button>' : '') +
         (p.phone ? '<a class="btn sm ghost" target="_blank" rel="noopener" href="' + esc(PC.waLink(p.phone, '')) + '">' + I('message') + 'WhatsApp</a>' : '') + '</div>';
     }
     modal({ title: id ? p.name : 'Nouveau partenaire', body, wide: true, foot: (id ? '<button class="btn danger" data-act="delete-partner" data-id="' + id + '">Supprimer</button>' : '') + '<button class="btn ghost" data-close>Fermer</button><button class="btn" type="submit" form="pa-form">Enregistrer</button>' });
@@ -1153,6 +1160,32 @@
     return h;
   }
 
+  // Modèles de réponse : tutoiement pour les sportifs, vouvoiement pour les clubs
+  function bookingMail(b, tpl) {
+    const c = clientById(b.client_id);
+    const p = partnerById(b.partner_id);
+    const s = bStart(b);
+    const first = String(b.client_name || (p && p.contact_name) || '').trim().split(/\s+/)[0];
+    const sv = PC.service(S, b.service);
+    const when = PC.fmtDayLong(s) + ' à ' + PC.fmtTime(s);
+    const hello = 'Bonjour' + (first ? ' ' + first : '') + ',\n\n';
+    const sign = '\n\nÀ bientôt,\n' + (S.business_name || 'Presso Center');
+    const to = b.client_email || (c && c.email) || (p && p.email) || '';
+    if (tpl === 'refuse') return { to, subject: 'Ta demande de séance du ' + when, body: hello + 'Malheureusement, le créneau du ' + when + ' n\'est plus disponible. Tu peux en choisir un autre ici : ' + bookingUrl() + sign };
+    return { to, subject: (sv ? sv.name : 'Séance') + ' du ' + when, body: hello + sign };
+  }
+  function partnerMail(p) {
+    const first = String(p.contact_name || '').trim().split(/\s+/)[0];
+    const hello = 'Bonjour' + (first ? ' ' + first : '') + ',\n\n';
+    const sign = '\n\nBien cordialement,\n' + (S.business_name || 'Presso Center');
+    const early = ['demande', 'prospect', 'discussion', 'accord'].includes(p.status);
+    return {
+      to: p.email || '',
+      subject: early ? 'Votre demande de test pilote ' + (S.business_name || 'Presso Center') : (S.business_name || 'Presso Center') + ' · ' + p.name,
+      body: hello + (early ? 'Merci pour votre demande. On vous propose un test pilote gratuit de 2 à 4 semaines, directement dans votre structure : on installe le matériel en 10 minutes et vos licenciés profitent des séances.\n\nQuels jours et quels horaires vous conviendraient ?' : '') + sign
+    };
+  }
+
   function openMessage(id) {
     const m = (D.messages || []).find((x) => x.id === id);
     if (!m) return;
@@ -1161,6 +1194,12 @@
     let body = '<p class="small muted">' + (incoming ? 'De <b style="color:var(--ink)">' + esc(m.from_name ? m.from_name + ' <' + m.from_email + '>' : m.from_email || '') + '</b>' : 'À <b style="color:var(--ink)">' + esc(m.to_email || '') + '</b>') +
       ' · ' + esc(PC.capitalize(PC.fmtDay(new Date(m.created_at), { weekday: 'long', day: 'numeric', month: 'long' }))) + ' à ' + PC.fmtTime(new Date(m.created_at)) + '</p>' +
       '<div class="msg-body">' + esc(m.body || '') + '</div>';
+    if (incoming) {
+      const em = String(m.from_email || '').toLowerCase();
+      const cl = em && D.clients.find((c) => String(c.email || '').toLowerCase() === em);
+      const pa = em && D.partners.find((x) => String(x.email || '').toLowerCase() === em);
+      if (cl || pa) body += '<div class="row wrap" style="margin-top:12px">' + (cl ? '<button class="btn sm soft" data-act="open-client" data-id="' + cl.id + '">' + I('users') + 'Fiche de ' + esc(cl.name) + '</button>' : '') + (pa ? '<button class="btn sm soft" data-act="open-partner" data-id="' + pa.id + '">' + I('users') + 'Fiche de ' + esc(pa.name) + '</button>' : '') + '</div>';
+    }
     if (atts.length) body += '<div class="alert" style="margin-top:12px">' + I('info') + '<span>Pièces jointes (' + atts.length + ') : ' + esc(atts.map((a) => a.filename).join(', ')) + '. Elles sont dans la copie reçue sur Gmail.</span></div>';
     if (incoming) {
       body += '<form id="reply-form" class="stack" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--line)"><label class="field"><span>Répondre à ' + esc(m.from_email || '') + '</span><textarea name="body" rows="6" required placeholder="Ta réponse…"></textarea><small>Envoyé au nom de ' + CONTACT_EMAIL + '. La réponse du client reviendra ici.</small></label><p class="form-error hide" id="reply-error" role="alert"></p></form>';
@@ -1773,7 +1812,11 @@
       case 'cancel-booking': {
         const b = D.bookings.find((x) => x.id === id);
         if (!window.confirm(b.status === 'demande' ? 'Refuser cette demande ?' : 'Annuler cette séance ?')) return;
-        return setStatus(id, 'annulee', b.status === 'demande' ? 'Demande refusée' : 'Séance annulée');
+        const wasRequest = b.status === 'demande';
+        const mail = bookingMail(b, 'refuse');
+        await setStatus(id, 'annulee', wasRequest ? 'Demande refusée' : 'Séance annulée');
+        if (wasRequest && mail.to) composeMessage(mail);
+        return undefined;
       }
       case 'absent-booking': return setStatus(id, 'absent', 'Marqué absent');
       case 'restore-booking': return setStatus(id, 'confirmee', 'Séance rétablie');
@@ -1822,6 +1865,14 @@
       case 'open-message': return openMessage(id);
       case 'new-message': return composeMessage();
       case 'write-client': return composeMessage({ to: el.dataset.to || '' });
+      case 'email-booking': {
+        const b = D.bookings.find((x) => x.id === id);
+        return b ? composeMessage(bookingMail(b, el.dataset.tpl)) : undefined;
+      }
+      case 'email-partner': {
+        const p = partnerById(id);
+        return p ? composeMessage(partnerMail(p)) : undefined;
+      }
       case 'delete-message': {
         if (!window.confirm('Supprimer ce message de la messagerie ?')) return;
         return run(async () => {
